@@ -108,15 +108,18 @@ func (s *Service) SetParent(ctx context.Context, branch, newParent string) error
 	if err != nil {
 		return err
 	}
-	newParentSHA, err := s.G.RevParse(ctx, newParent)
-	if err != nil {
-		return fmt.Errorf("resolving new parent SHA: %w", err)
-	}
 
 	s.recordHistory(ctx, "set-parent", fmt.Sprintf("%s onto %s", branch, newParent), branchAndDescendants(ctx, s, branch))
 
+	// Update only the Parent name; intentionally leave ParentSHA at
+	// its current value so the restack engine sees a mismatch
+	// (recorded SHA vs. new parent's actual tip) and triggers a real
+	// rebase. The engine writes the post-rebase tip back to ParentSHA
+	// itself once the rebase succeeds. Pre-updating ParentSHA here
+	// would defeat the engine's needsRebase check (recorded == new
+	// tip → no-op) and silently leave history pointing at the old
+	// parent's commits — see B5 in TESTRUN.md.
 	meta.Parent = newParent
-	meta.ParentSHA = newParentSHA
 	if err := s.Store.SetBranch(ctx, branch, meta); err != nil {
 		return err
 	}
