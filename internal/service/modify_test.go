@@ -201,3 +201,77 @@ func TestModifyAmendAllowedWhenBranchHasOwnCommits(t *testing.T) {
 		t.Fatalf("expected `git commit --amend`, calls: %v", r.calls)
 	}
 }
+
+// TestModifyStageAllUsesAddUpdate pins the B3 fix: the default `-a`
+// path stages tracked-but-modified files only (`git add -u`), so a
+// stray untracked file in the working tree is not silently absorbed
+// into the commit.
+func TestModifyStageAllUsesAddUpdate(t *testing.T) {
+	s, r := newFakeService(t, "feat-x", "main", 1)
+
+	err := s.Modify(context.Background(), ModifyOptions{Amend: true, StageAll: true})
+	if err != nil {
+		t.Fatalf("Modify: %v", err)
+	}
+	if !r.called("add", "-u") {
+		t.Fatalf("expected `git add -u`, calls: %v", r.calls)
+	}
+	if r.called("add", "-A") {
+		t.Fatalf("must not run `git add -A` without --include-untracked, calls: %v", r.calls)
+	}
+}
+
+// TestModifyStageAllWithUntrackedUsesAddAll verifies the opt-in path:
+// passing IncludeUntracked alongside StageAll restores the previous
+// "stage everything" behavior for users who genuinely want it.
+func TestModifyStageAllWithUntrackedUsesAddAll(t *testing.T) {
+	s, r := newFakeService(t, "feat-x", "main", 1)
+
+	err := s.Modify(context.Background(), ModifyOptions{Amend: true, StageAll: true, IncludeUntracked: true})
+	if err != nil {
+		t.Fatalf("Modify: %v", err)
+	}
+	if !r.called("add", "-A") {
+		t.Fatalf("expected `git add -A` with --include-untracked, calls: %v", r.calls)
+	}
+	if r.called("add", "-u") {
+		t.Fatalf("must not run both add invocations, calls: %v", r.calls)
+	}
+}
+
+// stagerSpy is a minimal gitStager that records which staging variant
+// was invoked. Lets us unit-test stageWorkingTree without spinning up
+// a full fake runner.
+type stagerSpy struct {
+	addAllCalled    bool
+	addUpdateCalled bool
+}
+
+func (s *stagerSpy) AddAll(_ context.Context) error    { s.addAllCalled = true; return nil }
+func (s *stagerSpy) AddUpdate(_ context.Context) error { s.addUpdateCalled = true; return nil }
+
+func TestStageWorkingTreeTrackedOnly(t *testing.T) {
+	spy := &stagerSpy{}
+	if err := stageWorkingTree(context.Background(), spy, false); err != nil {
+		t.Fatalf("stageWorkingTree: %v", err)
+	}
+	if !spy.addUpdateCalled {
+		t.Fatalf("expected AddUpdate to be called")
+	}
+	if spy.addAllCalled {
+		t.Fatalf("AddAll must not be called when includeUntracked=false")
+	}
+}
+
+func TestStageWorkingTreeIncludeUntracked(t *testing.T) {
+	spy := &stagerSpy{}
+	if err := stageWorkingTree(context.Background(), spy, true); err != nil {
+		t.Fatalf("stageWorkingTree: %v", err)
+	}
+	if !spy.addAllCalled {
+		t.Fatalf("expected AddAll to be called when includeUntracked=true")
+	}
+	if spy.addUpdateCalled {
+		t.Fatalf("AddUpdate must not be called when includeUntracked=true")
+	}
+}

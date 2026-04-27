@@ -163,9 +163,18 @@ func (c *Client) DeleteBranch(ctx context.Context, branch string, force bool) er
 	return err
 }
 
-// AddAll stages all changes (`git add -A`).
+// AddAll stages all changes including untracked files (`git add -A`).
 func (c *Client) AddAll(ctx context.Context) error {
 	_, _, err := c.r.Run(ctx, "add", "-A")
+	return err
+}
+
+// AddUpdate stages modifications and deletions of tracked files only
+// (`git add -u`), matching `git commit -a` semantics. Untracked files
+// are deliberately left alone — callers that want them must use
+// AddAll or stage them explicitly first.
+func (c *Client) AddUpdate(ctx context.Context) error {
+	_, _, err := c.r.Run(ctx, "add", "-u")
 	return err
 }
 

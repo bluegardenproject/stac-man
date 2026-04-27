@@ -71,11 +71,42 @@ type ModifyOptions struct {
 	// containing the staged (or staged + unstaged when StageAll is
 	// true) changes.
 	Amend bool
-	// StageAll stages all unstaged changes before committing/amending.
+	// StageAll stages tracked-but-modified files before committing,
+	// matching `git commit -a` semantics. Untracked files are NOT
+	// included unless IncludeUntracked is also true.
 	StageAll bool
+	// IncludeUntracked, in combination with StageAll, also stages
+	// new (untracked) files. Off by default to avoid silently
+	// absorbing unrelated work-in-progress.
+	IncludeUntracked bool
 	// Message is the commit message. Required when Commit=true and
 	// Amend=false; optional otherwise.
 	Message string
+}
+
+// stageWorkingTree stages working-tree changes for the upcoming
+// commit. By default it mirrors `git commit -a`: tracked-but-modified
+// files only. When includeUntracked is true it falls back to
+// `git add -A` so genuinely-new files are picked up too.
+func stageWorkingTree(ctx context.Context, g gitStager, includeUntracked bool) error {
+	var err error
+	if includeUntracked {
+		err = g.AddAll(ctx)
+	} else {
+		err = g.AddUpdate(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("staging changes: %w", err)
+	}
+	return nil
+}
+
+// gitStager is the subset of git.Client used by stageWorkingTree.
+// Pulling it out as a small interface keeps the helper trivially
+// fakeable in tests without dragging in the full Client.
+type gitStager interface {
+	AddAll(ctx context.Context) error
+	AddUpdate(ctx context.Context) error
 }
 
 // Modify amends the current commit (or creates a new one) and
@@ -131,8 +162,8 @@ func (s *Service) Modify(ctx context.Context, opts ModifyOptions) error {
 	s.recordHistory(ctx, "modify", current, branchAndDescendants(ctx, s, current))
 
 	if opts.StageAll {
-		if err := s.G.AddAll(ctx); err != nil {
-			return fmt.Errorf("staging changes: %w", err)
+		if err := stageWorkingTree(ctx, s.G, opts.IncludeUntracked); err != nil {
+			return err
 		}
 	}
 
