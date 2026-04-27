@@ -13,8 +13,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is the binary version. Overridden at build time via -ldflags.
-var Version = "0.0.0-dev"
+// Version and BuildTime are set by main.SetVersion at process start.
+// They live in package main so Release Please's `extra-files` config
+// can rewrite the literals without touching cmd/.
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+)
+
+// SetVersion is called from main() with the ldflags-injected values
+// before the cobra tree runs. Keeping it a setter (rather than reading
+// a package-main variable directly) lets cmd/ stay free of an import
+// cycle on the parent module.
+func SetVersion(version, buildTime string) {
+	if version != "" {
+		Version = version
+	}
+	if buildTime != "" {
+		BuildTime = buildTime
+	}
+}
 
 // Global flags exposed on the root command. Subcommands read these via
 // the package-level vars below rather than re-declaring them.
