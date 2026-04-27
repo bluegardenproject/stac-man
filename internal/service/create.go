@@ -16,8 +16,14 @@ type CreateOptions struct {
 	// branch immediately after checkout. Requires StageAll=true or
 	// pre-staged changes.
 	CommitMessage string
-	// StageAll runs `git add -A` before committing.
+	// StageAll stages tracked-but-modified files before committing,
+	// matching `git commit -a` semantics. Untracked files are NOT
+	// included unless IncludeUntracked is also true.
 	StageAll bool
+	// IncludeUntracked, in combination with StageAll, also stages
+	// new (untracked) files. Off by default to avoid silently
+	// absorbing unrelated work-in-progress.
+	IncludeUntracked bool
 }
 
 // Create branches off HEAD, sets the parent metadata, and optionally
@@ -69,8 +75,8 @@ func (s *Service) Create(ctx context.Context, opts CreateOptions) error {
 
 	if opts.CommitMessage != "" || opts.StageAll {
 		if opts.StageAll {
-			if err := s.G.AddAll(ctx); err != nil {
-				return fmt.Errorf("staging changes: %w", err)
+			if err := stageWorkingTree(ctx, s.G, opts.IncludeUntracked); err != nil {
+				return err
 			}
 		}
 		if opts.CommitMessage != "" {
