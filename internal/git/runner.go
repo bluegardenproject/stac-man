@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -24,14 +25,30 @@ type ExecRunner struct {
 	Dir string
 }
 
-// Run executes `git args...` and returns stdout, stderr, and any
-// non-zero exit error. It does not parse output — that's the Client's
-// job.
-func (e ExecRunner) Run(ctx context.Context, args ...string) (string, string, error) {
+// command builds the *exec.Cmd that Run executes. Extracted so tests
+// can assert the resulting argv, working directory, and env without
+// actually invoking git.
+//
+// `sm` orchestrates git non-interactively, so we override GIT_EDITOR
+// (and the legacy EDITOR fallback) to a no-op. Without this, paths
+// like `git rebase --continue` — which internally run `git commit`
+// to record a conflict resolution — fail with "Terminal is dumb,
+// but EDITOR unset" the moment a user runs `sm` from any context
+// without an interactive editor configured.
+func (e ExecRunner) command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	if e.Dir != "" {
 		cmd.Dir = e.Dir
 	}
+	cmd.Env = append(os.Environ(), "GIT_EDITOR=:", "EDITOR=:")
+	return cmd
+}
+
+// Run executes `git args...` and returns stdout, stderr, and any
+// non-zero exit error. It does not parse output — that's the Client's
+// job.
+func (e ExecRunner) Run(ctx context.Context, args ...string) (string, string, error) {
+	cmd := e.command(ctx, args...)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
