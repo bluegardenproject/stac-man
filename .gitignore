@@ -1,0 +1,35 @@
+# Binaries
+sm
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test / coverage
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go build cache / workspace files
+/vendor/
+go.work
+go.work.sum
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# stac-man interrupted-restack state lives in .git/stac-man/ which is
+# already ignored because .git/ is never tracked, but we explicitly
+# ignore the user-level local config override here:
+config.local.yaml
