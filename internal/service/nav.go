@@ -22,8 +22,102 @@ func (s *Service) Checkout(ctx context.Context, branch string) error {
 	return s.G.Checkout(ctx, branch)
 }
 
-// CheckoutChoices returns trunk + every tracked branch, sorted, with
-// the current branch first. Used by the interactive picker.
+// CheckoutItem is one row in the tree-shaped data set returned by
+// [Service.CheckoutTree]. It carries enough information for an
+// interactive picker (or a plain text fallback) to render the stack
+// graph as a selectable list. Callers translate this into UI by
+// reading the depth + ancestor flags to draw connectors and the
+// status flags (IsCurrent, NeedsRestack, …) to colour the row.
+type CheckoutItem struct {
+	// Branch is the branch name. For the trunk row this is the
+	// trunk's name (e.g. "main").
+	Branch string
+	// Depth is the distance from the trunk: 0 for the trunk row, 1
+	// for branches whose parent is the trunk, and so on.
+	Depth int
+	// IsTrunk is true only for the single trunk row at the top of
+	// the list.
+	IsTrunk bool
+	// IsCurrent is true for the row matching the branch HEAD is
+	// currently on. Always false on detached HEAD.
+	IsCurrent bool
+	// NeedsRestack is true when the branch's recorded ParentSHA no
+	// longer matches its parent's tip. Only set for non-trunk rows.
+	NeedsRestack bool
+	// PR is the GitHub PR number recorded in the store, or 0 when
+	// no PR has been linked yet.
+	PR int
+	// AncestorIsLast has one entry per ancestor between this row
+	// and the trunk (excluding this row's immediate parent). Each
+	// boolean records whether that ancestor was the last child of
+	// its parent at render time. Renderers use it to decide whether
+	// to draw a vertical pipe ("│  ") or empty padding ("   ") at
+	// each indentation level. Always nil for the trunk row.
+	AncestorIsLast []bool
+	// IsLastChild is true when this row is the alphabetically last
+	// child of its parent. Renderers use it to choose between the
+	// "├─ " and "└─ " connectors. Ignored when IsTrunk is true.
+	IsLastChild bool
+}
+
+// CheckoutTree returns the trunk plus every tracked branch as a
+// depth-first, alphabetically-ordered list of [CheckoutItem]s. The
+// shape mirrors what `sm log` renders, so an interactive picker can
+// turn the slice straight into a selectable stack tree without
+// re-implementing graph traversal.
+func (s *Service) CheckoutTree(ctx context.Context) (current string, items []CheckoutItem, err error) {
+	if err := s.EnsureRepo(ctx); err != nil {
+		return "", nil, err
+	}
+	trunk, err := s.EnsureTrunk(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	g, err := stack.Load(ctx, s.Store)
+	if err != nil {
+		return "", nil, err
+	}
+	current, _ = s.G.CurrentBranch(ctx)
+
+	items = append(items, CheckoutItem{
+		Branch:    trunk,
+		Depth:     0,
+		IsTrunk:   true,
+		IsCurrent: trunk == current,
+	})
+
+	var walk func(parent string, depth int, ancestors []bool)
+	walk = func(parent string, depth int, ancestors []bool) {
+		children := g.ChildrenOf(parent)
+		for i, child := range children {
+			isLast := i == len(children)-1
+			// Only ancestors *above* this row's immediate parent
+			// produce indentation pipes; the row's own connector is
+			// chosen from IsLastChild. So we hand the child the
+			// current ancestors slice without appending isLast.
+			ancestorsCopy := append([]bool(nil), ancestors...)
+			items = append(items, CheckoutItem{
+				Branch:         child.Name,
+				Depth:          depth,
+				IsCurrent:      child.Name == current,
+				NeedsRestack:   s.needsRestack(child),
+				PR:             child.PR,
+				AncestorIsLast: ancestorsCopy,
+				IsLastChild:    isLast,
+			})
+			walk(child.Name, depth+1, append(ancestors, isLast))
+		}
+	}
+	walk(trunk, 1, nil)
+
+	return current, items, nil
+}
+
+// CheckoutChoices returns trunk + every tracked branch as a flat,
+// sorted list with the current branch pinned at the front. The
+// interactive picker uses [Service.CheckoutTree] instead; this
+// flatter view is kept for future fzf-style integrations
+// (see ROADMAP "Fuzzy sm checkout").
 func (s *Service) CheckoutChoices(ctx context.Context) (current string, choices []string, err error) {
 	if err := s.EnsureRepo(ctx); err != nil {
 		return "", nil, err
