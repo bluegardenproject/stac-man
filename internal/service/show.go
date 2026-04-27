@@ -14,21 +14,21 @@ import (
 // JSON tags drive `sm show --json` so the same struct doubles as the
 // machine-readable contract for AI agents and scripts.
 type BranchView struct {
-	Branch        string       `json:"branch"`
-	Trunk         string       `json:"trunk"`
-	Tracked       bool         `json:"tracked"`
-	Parent        string       `json:"parent,omitempty"`
-	ParentSHA     string       `json:"parentSHA,omitempty"`
-	Tip           string       `json:"tip,omitempty"`
-	NeedsRestack  bool         `json:"needsRestack"`
-	Children      []string     `json:"children,omitempty"`
-	Ancestors     []string     `json:"ancestors,omitempty"` // immediate parent first, trunk excluded
-	AheadParent   int          `json:"aheadParent"`
-	BehindParent  int          `json:"behindParent"`
-	AheadTrunk    int          `json:"aheadTrunk"`
-	BehindTrunk   int          `json:"behindTrunk"`
-	PR            *PRView      `json:"pr,omitempty"`
-	Commits       []CommitView `json:"commits,omitempty"`
+	Branch       string       `json:"branch"`
+	Trunk        string       `json:"trunk"`
+	Tracked      bool         `json:"tracked"`
+	Parent       string       `json:"parent,omitempty"`
+	ParentSHA    string       `json:"parentSHA,omitempty"`
+	Tip          string       `json:"tip,omitempty"`
+	NeedsRestack bool         `json:"needsRestack"`
+	Children     []string     `json:"children,omitempty"`
+	Ancestors    []string     `json:"ancestors,omitempty"` // immediate parent first, trunk excluded
+	AheadParent  int          `json:"aheadParent"`
+	BehindParent int          `json:"behindParent"`
+	AheadTrunk   int          `json:"aheadTrunk"`
+	BehindTrunk  int          `json:"behindTrunk"`
+	PR           *PRView      `json:"pr,omitempty"`
+	Commits      []CommitView `json:"commits,omitempty"`
 }
 
 // PRView is the subset of PR fields stac-man surfaces in `sm show`.

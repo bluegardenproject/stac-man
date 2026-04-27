@@ -11,9 +11,9 @@ import (
 type MergeMethod string
 
 const (
-	MergeSquash  MergeMethod = "squash"
-	MergeCommit  MergeMethod = "merge"
-	MergeRebase  MergeMethod = "rebase"
+	MergeSquash MergeMethod = "squash"
+	MergeCommit MergeMethod = "merge"
+	MergeRebase MergeMethod = "rebase"
 )
 
 // MergePR merges a PR via `gh pr merge`. We pass --delete-branch=false

@@ -44,8 +44,8 @@ var (
 
 // Gradient stops (kept identical to github-butler so banners line up).
 var (
-	TitleStops      = []lipgloss.Color{NeonPink, NeonMagenta, NeonPurple, NeonCyan}
-	HeaderStops     = []lipgloss.Color{NeonCyan, NeonPink}
-	ConnectorStops  = []lipgloss.Color{NeonPurple, NeonMagenta, NeonPink, NeonCyan}
-	CountdownStops  = []lipgloss.Color{NeonPink, NeonPurple, NeonCyan}
+	TitleStops     = []lipgloss.Color{NeonPink, NeonMagenta, NeonPurple, NeonCyan}
+	HeaderStops    = []lipgloss.Color{NeonCyan, NeonPink}
+	ConnectorStops = []lipgloss.Color{NeonPurple, NeonMagenta, NeonPink, NeonCyan}
+	CountdownStops = []lipgloss.Color{NeonPink, NeonPurple, NeonCyan}
 )

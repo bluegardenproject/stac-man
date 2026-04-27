@@ -10,9 +10,9 @@ import (
 
 // GetReport summarizes the result of fetching a remote stack locally.
 type GetReport struct {
-	Trunk     string
-	Branches  []string // bottom-first order
-	Top       string
+	Trunk    string
+	Branches []string // bottom-first order
+	Top      string
 }
 
 // Get fetches every PR in the stack rooted at topPR and reproduces

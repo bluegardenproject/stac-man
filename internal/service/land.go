@@ -19,12 +19,12 @@ type LandOptions struct {
 
 // LandReport is what Land returns to the cmd layer.
 type LandReport struct {
-	Branch  string
-	PR      int
-	URL     string
-	Method  gh.MergeMethod
-	Sync    SyncReport
-	Synced  bool
+	Branch string
+	PR     int
+	URL    string
+	Method gh.MergeMethod
+	Sync   SyncReport
+	Synced bool
 }
 
 // Land merges the bottom-most tracked branch on the path from trunk

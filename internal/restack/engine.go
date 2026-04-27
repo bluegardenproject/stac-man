@@ -16,7 +16,7 @@ type Git interface {
 	GitDir(ctx context.Context) (string, error)
 	CurrentBranch(ctx context.Context) (string, error)
 	RevParse(ctx context.Context, ref string) (string, error)
-	Checkout(ctx context.Context, branch string) (error)
+	Checkout(ctx context.Context, branch string) error
 	Rebase(ctx context.Context, onto, upstream, branch string) error
 	RebaseInProgress(ctx context.Context) (bool, error)
 	RebaseContinue(ctx context.Context) error

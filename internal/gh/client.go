@@ -39,9 +39,9 @@ func (c *Client) CurrentRepo(ctx context.Context) (RepoInfo, error) {
 		return RepoInfo{}, err
 	}
 	var raw struct {
-		Owner             struct{ Login string } `json:"owner"`
-		Name              string                  `json:"name"`
-		DefaultBranchRef  struct{ Name string }  `json:"defaultBranchRef"`
+		Owner            struct{ Login string } `json:"owner"`
+		Name             string                 `json:"name"`
+		DefaultBranchRef struct{ Name string }  `json:"defaultBranchRef"`
 	}
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return RepoInfo{}, fmt.Errorf("parsing gh repo view: %w", err)

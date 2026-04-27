@@ -6,13 +6,13 @@ import "github.com/charmbracelet/lipgloss"
 // re-creating them inline so a palette tweak propagates everywhere.
 var (
 	// Generic emphasis
-	Bold    = lipgloss.NewStyle().Bold(true)
-	Dimmed  = lipgloss.NewStyle().Foreground(Dim)
-	Accent  = lipgloss.NewStyle().Foreground(NeonMagenta).Bold(true)
-	OK      = lipgloss.NewStyle().Foreground(NeonLime).Bold(true)
-	Warn    = lipgloss.NewStyle().Foreground(NeonYellow)
-	Fail    = lipgloss.NewStyle().Foreground(HotPink).Bold(true)
-	Info    = lipgloss.NewStyle().Foreground(NeonCyan)
+	Bold   = lipgloss.NewStyle().Bold(true)
+	Dimmed = lipgloss.NewStyle().Foreground(Dim)
+	Accent = lipgloss.NewStyle().Foreground(NeonMagenta).Bold(true)
+	OK     = lipgloss.NewStyle().Foreground(NeonLime).Bold(true)
+	Warn   = lipgloss.NewStyle().Foreground(NeonYellow)
+	Fail   = lipgloss.NewStyle().Foreground(HotPink).Bold(true)
+	Info   = lipgloss.NewStyle().Foreground(NeonCyan)
 
 	// Banners / headers
 	Title = lipgloss.NewStyle().

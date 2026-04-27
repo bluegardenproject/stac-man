@@ -145,11 +145,11 @@ func TestAutoMappingsHandlesNameCollision(t *testing.T) {
 
 func TestSlugifyBasic(t *testing.T) {
 	cases := map[string]string{
-		"Add new feature":   "add-new-feature",
-		"  spaced  out  ":   "spaced-out",
-		"feat: thing":       "feat-thing",
-		"":                  "",
-		"!!!":               "",
+		"Add new feature": "add-new-feature",
+		"  spaced  out  ": "spaced-out",
+		"feat: thing":     "feat-thing",
+		"":                "",
+		"!!!":             "",
 	}
 	for in, want := range cases {
 		if got := slugify(in); got != want {

@@ -69,7 +69,7 @@ const (
 // the stack. Returns the branch checked out.
 //
 //   - DirUp:     first child of current (errors if multiple unless
-//                preferAlpha=true, in which case alphabetically first)
+//     preferAlpha=true, in which case alphabetically first)
 //   - DirDown:   parent of current (errors if current is on trunk)
 //   - DirTop:    walk children to a leaf (alpha at forks)
 //   - DirBottom: walk parents until just above the trunk

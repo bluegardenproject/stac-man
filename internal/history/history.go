@@ -36,10 +36,10 @@ type Snapshot struct {
 
 // Entry is one undo-able step.
 type Entry struct {
-	ID    string              `json:"id"`
-	Time  time.Time           `json:"time"`
-	Op    string              `json:"op"`
-	Notes string              `json:"notes,omitempty"`
+	ID    string    `json:"id"`
+	Time  time.Time `json:"time"`
+	Op    string    `json:"op"`
+	Notes string    `json:"notes,omitempty"`
 	// Before captures the pre-op state of every branch the op touched.
 	Before map[string]Snapshot `json:"before"`
 	// HEAD records the branch that was checked out before the op so

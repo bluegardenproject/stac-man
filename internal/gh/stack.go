@@ -8,10 +8,10 @@ import (
 
 // PRRef is a slim PR identifier used to walk a stack's base-ref chain.
 type PRRef struct {
-	Number  int
-	Base    string // base branch on GitHub (e.g. main, or a feature branch)
-	Head    string // head branch on GitHub
-	URL     string
+	Number int
+	Base   string // base branch on GitHub (e.g. main, or a feature branch)
+	Head   string // head branch on GitHub
+	URL    string
 }
 
 // PRView fetches just the fields needed to walk a stack.

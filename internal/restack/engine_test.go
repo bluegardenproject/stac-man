@@ -32,12 +32,19 @@ type rebaseCall struct {
 	onto, upstream, branch string
 }
 
-func (f *fakeGit) GitDir(_ context.Context) (string, error)            { return f.gitDir, nil }
-func (f *fakeGit) CurrentBranch(_ context.Context) (string, error)     { return "feat-a", nil }
-func (f *fakeGit) Checkout(_ context.Context, branch string) error     { f.checkouts = append(f.checkouts, branch); return nil }
-func (f *fakeGit) RebaseInProgress(_ context.Context) (bool, error)    { return f.inProgress, nil }
-func (f *fakeGit) RebaseAbort(_ context.Context) error                 { f.aborted++; f.inProgress = false; return nil }
-func (f *fakeGit) RebaseContinue(_ context.Context) error              { f.continued++; f.inProgress = false; return nil }
+func (f *fakeGit) GitDir(_ context.Context) (string, error)        { return f.gitDir, nil }
+func (f *fakeGit) CurrentBranch(_ context.Context) (string, error) { return "feat-a", nil }
+func (f *fakeGit) Checkout(_ context.Context, branch string) error {
+	f.checkouts = append(f.checkouts, branch)
+	return nil
+}
+func (f *fakeGit) RebaseInProgress(_ context.Context) (bool, error) { return f.inProgress, nil }
+func (f *fakeGit) RebaseAbort(_ context.Context) error              { f.aborted++; f.inProgress = false; return nil }
+func (f *fakeGit) RebaseContinue(_ context.Context) error {
+	f.continued++
+	f.inProgress = false
+	return nil
+}
 
 func (f *fakeGit) RevParse(_ context.Context, ref string) (string, error) {
 	if sha, ok := f.tips[ref]; ok {
@@ -156,7 +163,7 @@ func TestContinueResumesRemaining(t *testing.T) {
 	_ = e.Restack(context.Background(), "feat-a") // pauses on feat-b
 
 	// Simulate the user resolving the conflict and rerunning sm continue.
-	g.conflictOn = "" // no more conflicts
+	g.conflictOn = ""               // no more conflicts
 	g.tips["feat-b"] = "feat-b-new" // git rebase --continue would advance this
 	if err := e.Continue(context.Background()); err != nil {
 		t.Fatalf("Continue: %v", err)
