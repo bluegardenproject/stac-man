@@ -6,20 +6,27 @@ Documentation is being written. See `cmd/` for the command surface and `internal
 
 ## Setup
 
-This repository ships its git hooks in [`.githooks/`](.githooks). After cloning, enable them once with:
+After cloning, run once:
 
 ```bash
-git config core.hooksPath .githooks
+make setup
 ```
 
-That's it — git will now run the in-repo hooks for every commit.
+This wires up the in-repo git hooks (via `core.hooksPath`) and makes them executable. Common targets like `make build` and `make test` re-run `setup` automatically, so the hook stays active even if you skip it on day one.
 
-### What the hooks do
+### Commit message policy
 
-- `commit-msg`: enforces [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) on the commit header, e.g. `feat(git): add typed accessors`. Merge, revert, fixup, squash, and amend commits are skipped.
+Commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/), e.g. `feat(git): add typed accessors`. Enforcement runs in two places:
 
-If you ever need to bypass the hook for a one-off (e.g. an emergency fix), use git's standard escape hatch:
+- **Locally**: a `commit-msg` hook (see [`.githooks/commit-msg`](.githooks/commit-msg)) blocks invalid messages before the commit lands.
+- **In CI**: a GitHub Actions workflow re-runs the same check on every PR. This is the gate — local hooks can be skipped with `--no-verify`, CI cannot.
+
+Both run the same validator: [`scripts/check-commit-msg.sh`](scripts/check-commit-msg.sh).
+
+If you really need to bypass the local hook for an exceptional case:
 
 ```bash
 git commit --no-verify
 ```
+
+The CI check will still run on the PR.

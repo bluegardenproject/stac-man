@@ -1,0 +1,38 @@
+---
+description: Enforce Conventional Commits and ensure local hooks are active
+alwaysApply: true
+---
+
+# Commit Discipline
+
+Before creating any git commit in this repo:
+
+1. Verify the local commit-msg hook is wired. If `git config core.hooksPath` does not return `.githooks`, run `make setup` (or `git config core.hooksPath .githooks`) before committing. Never run `git commit --no-verify`.
+2. Format every commit message header as [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/):
+
+   ```
+   <type>(<optional scope>)!: <subject>
+
+   <optional body>
+
+   <optional footers>
+   ```
+
+   Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Scope is lower-case. `!` marks a breaking change. Subject is required and non-empty.
+
+3. Do not add AI/tool attribution (e.g. "made with Cursor", "Co-authored-by: Cursor"); see `no-ai-attribution.mdc`.
+
+```
+# BAD
+update stuff
+
+added the git client
+
+# GOOD
+feat(git): add typed accessors for git config
+
+Wraps `git config --get` with a typed accessor so callers do not have to
+parse stdout. Uses the fake runner under test.
+```
+
+If a commit you are about to create would fail [`scripts/check-commit-msg.sh`](scripts/check-commit-msg.sh), rewrite the message before invoking `git commit`. The CI workflow `commitlint.yml` will reject the PR otherwise.
