@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -91,6 +92,34 @@ func itoa(n int) string {
 		buf[i] = '-'
 	}
 	return string(buf[i:])
+}
+
+// TestExecRunnerOverridesEditorEnv pins B4: every `git` invocation
+// from sm must carry GIT_EDITOR=: (and EDITOR=: as a legacy fallback)
+// so non-interactive contexts — most importantly `git rebase --continue`
+// triggered by `sm continue` — don't fail with "Terminal is dumb, but
+// EDITOR unset".
+func TestExecRunnerOverridesEditorEnv(t *testing.T) {
+	r := ExecRunner{Dir: t.TempDir()}
+	cmd := r.command(context.Background(), "status", "--porcelain")
+
+	if got, want := cmd.Args[0], "git"; got != want {
+		t.Fatalf("argv[0] = %q, want %q", got, want)
+	}
+	wantKeys := map[string]string{"GIT_EDITOR": ":", "EDITOR": ":"}
+	got := map[string]string{}
+	for _, kv := range cmd.Env {
+		for k := range wantKeys {
+			if strings.HasPrefix(kv, k+"=") {
+				got[k] = strings.TrimPrefix(kv, k+"=")
+			}
+		}
+	}
+	for k, want := range wantKeys {
+		if got[k] != want {
+			t.Fatalf("env %s = %q, want %q (full env had %d entries)", k, got[k], want, len(cmd.Env))
+		}
+	}
 }
 
 func TestCurrentBranch(t *testing.T) {
