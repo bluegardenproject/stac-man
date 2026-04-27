@@ -1,10 +1,10 @@
 # stac-man
 
-`sm` — a CLI for stacked pull requests, in the spirit of Graphite's `gt`. Free, local-only, no IDE plugin. Stack metadata lives in your local git config; pull-request operations are delegated to the [GitHub CLI (`gh`)](https://cli.github.com/).
+`sm` — a CLI for stacked pull requests. Free, local-only, no IDE plugin, no SaaS, no login. Stack metadata lives in your local git config; pull-request operations are delegated to the [GitHub CLI (`gh`)](https://cli.github.com/).
 
 ## Why
 
-If you've worked with Graphite, the workflow is the same: small, dependent branches that each become their own PR, with each PR's base set to the branch below it. `sm` keeps that workflow without a SaaS or login.
+Stacked pull requests — small, dependent branches that each become their own PR, with each PR's base set to the branch below it — make code review faster and keep changes reviewable. `sm` is a thin tool that records the parent of each branch in git config and keeps the chain in sync as you iterate.
 
 ## Install
 
@@ -186,13 +186,6 @@ You can also reproduce the cross-compile locally without publishing:
 make build-all      # → dist/sm-{linux,darwin,windows}-{amd64,arm64}{.exe}
 make release        # clean + build-all
 ```
-
-## Roadmap
-
-- **v1** — the v1 command surface above; CLI only.
-- **v2.0** (current) — Graphite parity additions: `absorb`, `move`, `land`, `split`, `show`, `get`, `undo`, shell completions.
-- **v2.1** — interactive TUI menu for the most common flows (`sm`, no subcommand).
-- **v3** — signed binaries, Homebrew tap, full docs website.
 
 ## License
 

@@ -4,7 +4,7 @@ description: Use the stac-man (sm) CLI to manage stacked branches and pull reque
 
 # stac-man — using the `sm` CLI
 
-`stac-man` (binary: `sm`) is a CLI for managing **stacked pull requests** the way Graphite's `gt` does, but free, local-only, and without the IDE plugin. Stack metadata lives in the local git config; pull-request operations are delegated to `gh`.
+`stac-man` (binary: `sm`) is a CLI for managing **stacked pull requests**. Free, local-only, no IDE plugin, no SaaS, no login. Stack metadata lives in the local git config; pull-request operations are delegated to `gh`.
 
 This skill applies whenever the user wants to:
 
