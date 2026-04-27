@@ -22,6 +22,7 @@ stac-man/
     service/                    # orchestration: every user op is a method here
     restack/                    # rebase walk + on-disk resume state
     config/                     # optional ~/.config/stac-man/config.yaml
+    history/                    # bounded undo log under .git/stac-man/history.json
     ui/, ui/theme/              # neon-synthwave styling (lipgloss)
 ```
 
@@ -33,6 +34,7 @@ stac-man/
 - **`internal/store/`** is the metadata source of truth (`gitconfig` impl in production, `memory` impl in tests). Never read git config directly elsewhere.
 - **`internal/stack/`** is pure: takes a `store.Store`, returns an in-memory `Graph`. No I/O after `Load`.
 - **`internal/restack/`** is the rebase engine — walks a topo-ordered queue and persists resume state to `.git/stac-man/restack.json`.
+- **`internal/history/`** persists the undo log. Every mutating service method MUST call `s.recordHistory(ctx, op, notes, branches)` before mutating, listing every branch the op may touch. `sm undo` rewinds the most recent entry.
 
 ## Adding a new subcommand
 
@@ -41,6 +43,7 @@ stac-man/
 3. Add the method in `internal/service/<area>.go`. Keep everything testable: do all I/O through the `*git.Client`, `*gh.Client`, and `store.Store` already on `*Service`.
 4. If the method needs a new git operation, add a typed wrapper to `internal/git/client.go`. Don't shell out from service code directly.
 5. Test the service method against `memory.Store` plus a fake `git` runner — never against the real binary.
+6. Mutating methods record an undo entry: call `s.recordHistory(ctx, "<op>", "<notes>", []string{<every branch this op may touch>})` BEFORE the first mutation. The list should include the current branch, any branches whose tip or parent metadata may move, and (for ops that delete or create branches) the branches being deleted/created. Snapshots are best-effort — don't fail the op if history write fails.
 
 ## Testing rules
 

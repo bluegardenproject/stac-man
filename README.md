@@ -8,21 +8,48 @@ If you've worked with Graphite, the workflow is the same: small, dependent branc
 
 ## Install
 
-Build from source (Go 1.25+):
+One-liner (Linux / macOS):
 
 ```bash
-git clone https://github.com/philipptpunkt/stac-man.git
-cd stac-man
-make build
-sudo install -m 0755 sm /usr/local/bin/sm
+curl -fsSL https://raw.githubusercontent.com/philipptpunkt/stac-man/main/scripts/install.sh | bash
 ```
+
+PowerShell (Windows):
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/philipptpunkt/stac-man/main/scripts/install.ps1 | iex
+```
+
+This downloads the latest release binary into `~/.stac-man/sm` (or `%USERPROFILE%\.stac-man\sm.exe` on Windows) and adds that directory to your shell's `PATH`. You may need to restart your shell or `source` your shell rc file the first time.
 
 Verify:
 
 ```bash
 sm --version
-gh auth status   # only needed for `sm submit`
+sm version          # full styled output (build time, platform, config path)
+gh auth status      # only needed for `sm submit`
 ```
+
+### Build from source
+
+For contributors or platforms without a published binary (Go 1.25+):
+
+```bash
+git clone https://github.com/philipptpunkt/stac-man.git
+cd stac-man
+make build          # → ./sm with embedded version + build time
+```
+
+## Updating
+
+```bash
+sm update           # install the latest release in-place
+sm update --check   # only report whether a newer release exists
+```
+
+`sm update` shells out to the same install one-liner above. Dev builds (`Version == "dev"`) skip the network check and print a hint instead.
+
+If `sm` itself is broken, fall back to the curl/iwr one-liner from the [Install](#install) section.
 
 ## Quickstart
 
@@ -40,7 +67,9 @@ sm log                               # see the tree
 sm submit --stack                    # push + open PRs with bases wired
 ```
 
-## Command surface (v1)
+## Command surface
+
+### Core (v1)
 
 | Command | What it does |
 |---|---|
@@ -57,6 +86,37 @@ sm submit --stack                    # push + open PRs with bases wired
 | `sm parent [--set X]` / `sm children` | Inspect or change relationships. |
 | `sm fold [-m msg]` | Squash branch into parent. |
 | `sm doctor` / `sm status` | Sanity-check metadata vs. git state. |
+
+### v2 additions
+
+| Command | What it does |
+|---|---|
+| `sm absorb [--base X]` | Auto-route uncommitted hunks into the right ancestor commits via [`git-absorb`](https://github.com/tummychow/git-absorb), then restack descendants. |
+| `sm move --onto X [branch]` | Reparent a branch (and its subtree) onto a new base; descendants ride along. |
+| `sm land [--squash\|--merge\|--rebase] [--force]` | Merge the bottom-most PR via `gh pr merge` and run `sm sync` to clean up. CI-green by default. |
+| `sm split [--names a,b,c --commits 1-2,3,4-5]` | Decompose the current branch into a chain of smaller branches (one per commit by default). |
+| `sm show [branch] [--json]` | Detailed branch view: parent, children, ahead/behind, PR, commit list. `--json` for scripts/agents. |
+| `sm get <PR-number>` | Fetch a colleague's stack locally and reproduce its parent edges, then print `sm log`. |
+| `sm undo [--dry-run]` | Reflog-style rollback of the most recent stac-man op (last 50 ops kept under `.git/stac-man/history.json`). |
+| `sm completion <shell>` | Generate completion scripts for bash / zsh / fish / powershell. |
+
+### Enable completions
+
+Tab-completes subcommands and tracked branch names on `sm checkout`, `sm parent`, `sm move`, `sm show`.
+
+```bash
+# zsh
+sm completion zsh > "${fpath[1]}/_sm"      # then restart your shell
+
+# bash
+sm completion bash > /etc/bash_completion.d/sm
+
+# fish
+sm completion fish > ~/.config/fish/completions/sm.fish
+
+# powershell
+sm completion powershell > sm.ps1; . ./sm.ps1
+```
 
 ## AI agent integration
 
@@ -82,6 +142,7 @@ A full docs site is planned for v3 alongside a release process.
   - `branch.<name>.stac-man-parent`, `branch.<name>.stac-man-parent-sha`, `branch.<name>.stac-man-pr`
 - **Per-user**, optional, in `~/.config/stac-man/config.yaml`: color, default base branch, draft-PR default. The file is optional; `sm` ships defaults.
 - **Resume state** during a paused rebase: `.git/stac-man/restack.json` (auto-managed).
+- **Undo history**: `.git/stac-man/history.json` (newest-first, capped at 50 entries; consumed by `sm undo`).
 
 `sm` never stores GitHub tokens — `gh` handles that.
 
@@ -103,11 +164,35 @@ Commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits
 
 Both call [`scripts/check-commit-msg.sh`](scripts/check-commit-msg.sh).
 
+## Releasing
+
+Releases are driven by [Release Please](https://github.com/googleapis/release-please) using the Conventional Commits in `main`:
+
+1. Push a `feat:` / `fix:` / `perf:` / etc. commit to `main`.
+2. The [Release Please workflow](.github/workflows/release-please.yml) opens (or updates) a release PR that bumps the version in [`main.go`](main.go), updates [`CHANGELOG.md`](CHANGELOG.md), and bumps [`.release-please-manifest.json`](.release-please-manifest.json).
+3. Merging that PR creates a `vX.Y.Z` git tag plus a GitHub Release.
+4. The same workflow then cross-compiles and uploads five binaries to the release: `sm-linux-amd64`, `sm-linux-arm64`, `sm-darwin-amd64`, `sm-darwin-arm64`, `sm-windows-amd64.exe`.
+5. The install script picks up the new asset on its next run, and `sm update` will see the new tag.
+
+Conventional Commit types are mapped to changelog sections in [`release-please-config.json`](release-please-config.json) (Features / Bug Fixes / Performance / Reverts / Documentation / Misc).
+
+### Repo setup (one-time)
+
+The release workflow needs a `PAT_TOKEN` secret with `repo` + `workflow` scope so that the release-please action can open PRs and trigger the asset-upload step. Add it under **Settings → Secrets and variables → Actions**.
+
+You can also reproduce the cross-compile locally without publishing:
+
+```bash
+make build-all      # → dist/sm-{linux,darwin,windows}-{amd64,arm64}{.exe}
+make release        # clean + build-all
+```
+
 ## Roadmap
 
-- **v1** (current) — the command surface above; CLI only.
-- **v2** — interactive TUI menu for the most common flows (`sm`, no subcommand).
-- **v3** — release process (signed binaries, Homebrew tap), full docs website.
+- **v1** — the v1 command surface above; CLI only.
+- **v2.0** (current) — Graphite parity additions: `absorb`, `move`, `land`, `split`, `show`, `get`, `undo`, shell completions.
+- **v2.1** — interactive TUI menu for the most common flows (`sm`, no subcommand).
+- **v3** — signed binaries, Homebrew tap, full docs website.
 
 ## License
 

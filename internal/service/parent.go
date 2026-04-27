@@ -112,6 +112,9 @@ func (s *Service) SetParent(ctx context.Context, branch, newParent string) error
 	if err != nil {
 		return fmt.Errorf("resolving new parent SHA: %w", err)
 	}
+
+	s.recordHistory(ctx, "set-parent", fmt.Sprintf("%s onto %s", branch, newParent), branchAndDescendants(ctx, s, branch))
+
 	meta.Parent = newParent
 	meta.ParentSHA = newParentSHA
 	if err := s.Store.SetBranch(ctx, branch, meta); err != nil {
@@ -120,6 +123,25 @@ func (s *Service) SetParent(ctx context.Context, branch, newParent string) error
 
 	// Restack to actually move history onto the new parent.
 	return restack.New(s.G, s.Store).Restack(ctx, branch)
+}
+
+// Move reparents branch (default: current) onto newParent and
+// restacks the entire subtree onto its new base. Descendants ride
+// along through the restack engine's cascade — we only flip branch's
+// parent metadata; children keep their existing parents and are
+// rebased automatically because their parent's tip moves.
+func (s *Service) Move(ctx context.Context, branch, newParent string) error {
+	if newParent == "" {
+		return errors.New("--onto is required")
+	}
+	if branch == "" {
+		var err error
+		branch, err = s.G.CurrentBranch(ctx)
+		if err != nil {
+			return err
+		}
+	}
+	return s.SetParent(ctx, branch, newParent)
 }
 
 // Fold squashes the current branch into its parent: every commit
@@ -178,6 +200,14 @@ func (s *Service) Fold(ctx context.Context, message string) error {
 	if message == "" {
 		message = fmt.Sprintf("fold %s into %s", current, parent)
 	}
+
+	// Snapshot every branch the fold touches: current, parent, and
+	// every child that will be reparented.
+	touched := []string{current, parent}
+	for _, child := range g.ChildrenOf(current) {
+		touched = append(touched, child.Name)
+	}
+	s.recordHistory(ctx, "fold", current+" into "+parent, touched)
 
 	// Switch to the parent and merge --squash from current. This
 	// stages the cumulative diff without creating a merge commit.

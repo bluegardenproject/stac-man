@@ -84,6 +84,12 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		targets = []stack.Branch{b}
 	}
 
+	names := make([]string, 0, len(targets))
+	for _, t := range targets {
+		names = append(names, t.Name)
+	}
+	s.recordHistory(ctx, "submit", "", names)
+
 	client := gh.New("")
 
 	for _, b := range targets {

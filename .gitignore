@@ -33,3 +33,6 @@ go.work.sum
 # already ignored because .git/ is never tracked, but we explicitly
 # ignore the user-level local config override here:
 config.local.yaml
+
+# local notes
+ROADMAP.md

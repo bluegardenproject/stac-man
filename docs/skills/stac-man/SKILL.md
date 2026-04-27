@@ -61,6 +61,13 @@ sm submit --stack
 | `sm parent [--set X]` / `sm children` | Inspect or reassign parent/child relationships. |
 | `sm fold [-m msg]` | Squash the current branch into its parent and re-parent any children. |
 | `sm doctor` (alias: `status`) | Sanity-check stac-man metadata vs. git state. Print first whenever the user reports something weird. |
+| `sm absorb [--base X]` | Auto-route uncommitted hunks into the right ancestor commits (wraps `git-absorb`), then restacks descendants. **Most agent-relevant new verb** — replaces a manual amend-and-restack loop. |
+| `sm move --onto X [branch]` | Reparent a branch (and its subtree) onto a new base; descendants ride along. |
+| `sm land [--squash\|--merge\|--rebase] [--force]` | Merge the bottom-most PR via `gh pr merge` and run `sm sync` to clean up. CI-green gate by default. |
+| `sm split [--names a,b,c --commits 1-2,3,4-5]` | Decompose the current branch into a chain of smaller branches (one per commit by default). |
+| `sm show [branch] [--json]` | Detailed branch view: parent, children, ahead/behind, PR, commit list. Prefer `--json` when reading programmatically. |
+| `sm get <PR-number>` | Fetch a colleague's stack locally and reproduce its parent edges, then print `sm log`. |
+| `sm undo [--dry-run]` | Reflog-style rollback of the most recent stac-man op (last 50 ops kept under `.git/stac-man/history.json`). |
 
 ## Decision rules for the agent
 
@@ -71,6 +78,10 @@ sm submit --stack
 - **User says "rebase"**: in a stack, that almost always means `sm restack`, not `git rebase`. Use `sm restack`.
 - **User says "switch branches"**: use `sm checkout <name>` (or `sm up` / `sm down`) so navigation feels stack-aware.
 - **Things look broken (stale parent SHA, orphan branches, untracked roots):** run `sm doctor` first; it tells you exactly what's drifted.
+- **User has uncommitted fixups for prior commits in the stack:** prefer `sm absorb` over manually `git commit --fixup` + `git rebase --autosquash`; absorb does both and cascades the restack.
+- **Pulling someone else's stack to review:** prefer `sm get <PR>` over multiple `gh pr checkout` invocations — it sets the parent metadata so `sm log` mirrors the author's tree.
+- **User wants to undo what `sm` just did:** prefer `sm undo` over manual `git reset` + git config edits. Refuses while a rebase is paused — finish or abort first.
+- **Reading branch state programmatically:** prefer `sm show --json` over scraping `sm log`.
 
 ## Conflict handling
 

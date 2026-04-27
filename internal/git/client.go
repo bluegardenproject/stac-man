@@ -339,6 +339,66 @@ func (c *Client) Push(ctx context.Context, branch string, forceLease bool) error
 	return err
 }
 
+// Commit describes a single commit.
+type Commit struct {
+	SHA     string
+	Subject string
+}
+
+// LogBetween returns the commits unique to head that aren't in base,
+// in oldest-first order. Each entry has the full SHA and the commit's
+// subject line.
+func (c *Client) LogBetween(ctx context.Context, base, head string) ([]Commit, error) {
+	out, _, err := c.r.Run(ctx, "log", "--reverse", "--pretty=format:%H%x09%s", base+".."+head)
+	if err != nil {
+		return nil, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return nil, nil
+	}
+	var commits []Commit
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
+		tab := strings.IndexByte(line, '\t')
+		if tab <= 0 {
+			continue
+		}
+		commits = append(commits, Commit{SHA: line[:tab], Subject: line[tab+1:]})
+	}
+	return commits, nil
+}
+
+// CherryPick applies one commit on top of HEAD.
+func (c *Client) CherryPick(ctx context.Context, sha string) error {
+	_, _, err := c.r.Run(ctx, "cherry-pick", sha)
+	return err
+}
+
+// CherryPickAbort aborts an in-progress cherry-pick.
+func (c *Client) CherryPickAbort(ctx context.Context) error {
+	_, _, err := c.r.Run(ctx, "cherry-pick", "--abort")
+	return err
+}
+
+// SwitchCreate creates `name` starting at `start` and checks it out
+// (`git switch -c name start`). Use this when you want a fresh branch
+// pointing at a specific ref.
+func (c *Client) SwitchCreate(ctx context.Context, name, start string) error {
+	_, _, err := c.r.Run(ctx, "switch", "-c", name, start)
+	return err
+}
+
+// UpdateRef writes refs/heads/<branch> to point at sha
+// (`git update-ref refs/heads/<branch> <sha>`). Used by `sm undo` to
+// restore branch tips without checking them out.
+func (c *Client) UpdateRef(ctx context.Context, branch, sha string) error {
+	_, _, err := c.r.Run(ctx, "update-ref", "refs/heads/"+branch, sha)
+	return err
+}
+
 // SymbolicRef reads a symbolic ref (e.g. "refs/remotes/origin/HEAD").
 // Returns "" and false if the ref isn't set.
 func (c *Client) SymbolicRef(ctx context.Context, name string) (string, bool, error) {

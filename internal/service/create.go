@@ -61,6 +61,8 @@ func (s *Service) Create(ctx context.Context, opts CreateOptions) error {
 		return fmt.Errorf("branch %q already exists", opts.Name)
 	}
 
+	s.recordHistory(ctx, "create", opts.Name, []string{opts.Name, parent})
+
 	if err := s.G.CheckoutNew(ctx, opts.Name); err != nil {
 		return fmt.Errorf("creating branch: %w", err)
 	}

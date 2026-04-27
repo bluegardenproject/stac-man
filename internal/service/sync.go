@@ -40,6 +40,11 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 
 	originalBranch, _ := s.G.CurrentBranch(ctx)
 
+	// Snapshot every tracked branch up-front so undo can revert merges,
+	// reparenting, and restacks together.
+	tracked, _ := s.Store.ListTrackedBranches(ctx)
+	s.recordHistory(ctx, "sync", "", append([]string{trunk}, tracked...))
+
 	if err := s.G.FetchAll(ctx); err != nil {
 		return r, fmt.Errorf("fetching: %w", err)
 	}

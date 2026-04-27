@@ -17,7 +17,8 @@ func init() {
 		Long: "With an argument, checkout switches HEAD to the named branch. " +
 			"Without an argument it lists tracked branches grouped with the trunk; on a TTY " +
 			"the user is prompted to pick one.",
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchNameCompletion,
 		RunE: func(c *cobra.Command, args []string) error {
 			s := newService()
 			if len(args) == 1 {

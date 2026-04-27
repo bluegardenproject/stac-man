@@ -15,7 +15,8 @@ func init() {
 		Short: "Show or change the parent of a branch",
 		Long: "Without --set, prints the parent of the named branch (or the current branch). " +
 			"With --set <branch>, reassigns the parent and restacks history onto the new base.",
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchNameCompletion,
 		RunE: func(c *cobra.Command, args []string) error {
 			branch := ""
 			if len(args) == 1 {

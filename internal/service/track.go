@@ -66,6 +66,8 @@ func (s *Service) Track(ctx context.Context, opts TrackOptions) (string, error) 
 		return "", fmt.Errorf("resolving parent SHA: %w", err)
 	}
 
+	s.recordHistory(ctx, "track", branch, []string{branch})
+
 	meta := store.BranchMeta{Parent: parent, ParentSHA: parentSHA}
 	// Preserve an existing PR number so re-tracking doesn't lose it.
 	if existing, ok, err := s.Store.GetBranch(ctx, branch); err == nil && ok {
@@ -156,6 +158,12 @@ func (s *Service) Untrack(ctx context.Context, branch string, reparent bool) err
 	if len(children) > 0 && !reparent {
 		return fmt.Errorf("branch %q has %d tracked children; pass --reparent to move them onto its parent", branch, len(children))
 	}
+
+	touched := []string{branch}
+	for _, child := range children {
+		touched = append(touched, child.Name)
+	}
+	s.recordHistory(ctx, "untrack", branch, touched)
 
 	if reparent && len(children) > 0 {
 		parent, _ := g.Get(branch)

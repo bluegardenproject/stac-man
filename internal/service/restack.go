@@ -6,8 +6,24 @@ import (
 	"fmt"
 
 	"github.com/philipptpunkt/stac-man/internal/restack"
+	"github.com/philipptpunkt/stac-man/internal/stack"
 	"github.com/philipptpunkt/stac-man/internal/store"
 )
+
+// branchAndDescendants returns name plus its tracked descendants.
+// Used by recordHistory call sites that affect a whole subtree.
+// Errors are swallowed — history is best-effort.
+func branchAndDescendants(ctx context.Context, s *Service, name string) []string {
+	out := []string{name}
+	g, err := stack.Load(ctx, s.Store)
+	if err != nil {
+		return out
+	}
+	for _, d := range g.Descendants(name) {
+		out = append(out, d.Name)
+	}
+	return out
+}
 
 // Restack rebases the current (or named) branch and every tracked
 // descendant onto its parent's current tip.
@@ -25,6 +41,7 @@ func (s *Service) Restack(ctx context.Context, branch string) error {
 			return err
 		}
 	}
+	s.recordHistory(ctx, "restack", branch, branchAndDescendants(ctx, s, branch))
 	return restack.New(s.G, s.Store).Restack(ctx, branch)
 }
 
@@ -87,6 +104,8 @@ func (s *Service) Modify(ctx context.Context, opts ModifyOptions) error {
 	if opts.Commit && opts.Message == "" {
 		return errors.New("--commit requires -m <message>")
 	}
+
+	s.recordHistory(ctx, "modify", current, branchAndDescendants(ctx, s, current))
 
 	if opts.StageAll {
 		if err := s.G.AddAll(ctx); err != nil {
