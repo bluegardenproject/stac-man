@@ -23,6 +23,18 @@ var (
 	flagVerbose bool
 )
 
+// pendingSubcommands is populated by each subcommand's init() via the
+// register() helper. We attach them in newRootCmd so init order between
+// files doesn't matter.
+var pendingSubcommands []*cobra.Command
+
+// register adds a subcommand to be wired into the root in newRootCmd.
+// Files in this package call register(...) from init() to keep
+// per-command wiring close to the command itself.
+func register(cmd *cobra.Command) {
+	pendingSubcommands = append(pendingSubcommands, cmd)
+}
+
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "sm",
@@ -41,6 +53,10 @@ func newRootCmd() *cobra.Command {
 
 	root.PersistentFlags().BoolVar(&flagNoColor, "no-color", false, "disable all color output (also respects NO_COLOR env var)")
 	root.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "verbose output (prints underlying git/gh commands)")
+
+	for _, sub := range pendingSubcommands {
+		root.AddCommand(sub)
+	}
 
 	return root
 }

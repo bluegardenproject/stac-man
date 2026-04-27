@@ -1,47 +1,5 @@
 #!/usr/bin/env bash
-# Enforces Conventional Commits 1.0.0 on the commit message header.
-# https://www.conventionalcommits.org/en/v1.0.0/
+# Thin wrapper: defer to the shared validator so local and CI use identical rules.
 set -euo pipefail
-
-msg_file="${1:?commit message file path required}"
-header="$(sed -n '1p' "$msg_file")"
-
-# Strip comment lines that git may have prepended (shouldn't apply to first line,
-# but kept defensive for editors that reorder).
-case "$header" in
-	"#"*) header="$(grep -v '^#' "$msg_file" | sed -n '1p')" ;;
-esac
-
-# Skip messages git itself generates or that will be reworded later.
-case "$header" in
-	"Merge "*|"Revert \""*|"fixup! "*|"squash! "*|"amend! "*)
-		exit 0
-		;;
-esac
-
-pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: .+'
-
-if [[ "$header" =~ $pattern ]]; then
-	exit 0
-fi
-
-cat >&2 <<EOF
-commit-msg: header does not match Conventional Commits 1.0.0.
-
-  got:      ${header}
-  expected: <type>(<scope>)!: <subject>
-
-  type:    build | chore | ci | docs | feat | fix | perf | refactor | revert | style | test
-  scope:   optional, lower-case (e.g. (git), (ui/theme))
-  !:       optional, marks a breaking change
-  subject: required, non-empty
-
-example:
-  feat(git): add typed accessors for git config
-
-See https://www.conventionalcommits.org/en/v1.0.0/
-
-To bypass for an exceptional case, re-run with --no-verify.
-EOF
-
-exit 1
+repo_root="$(git rev-parse --show-toplevel)"
+exec "${repo_root}/scripts/check-commit-msg.sh" "$1"
