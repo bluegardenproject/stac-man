@@ -190,6 +190,14 @@ func (c *Client) Commit(ctx context.Context, msg string, amend, allowEmpty bool)
 	return err
 }
 
+// MergeSquash runs `git merge --squash <branch>` against HEAD. Used
+// by `sm fold` to collapse a branch's commits onto its parent without
+// creating a merge commit.
+func (c *Client) MergeSquash(ctx context.Context, branch string) error {
+	_, _, err := c.r.Run(ctx, "merge", "--squash", branch)
+	return err
+}
+
 // Rebase runs `git rebase --onto onto upstream branch`. Use this for
 // stack restacks: `onto` is the parent's new tip, `upstream` is the
 // parent's old tip, `branch` is the branch being moved.
