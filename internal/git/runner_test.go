@@ -1,0 +1,270 @@
+package git
+
+import (
+	"context"
+	"errors"
+	"os/exec"
+	"testing"
+)
+
+// fakeRunner is a deterministic Runner used by Client tests.
+//
+// Calls is appended in order so tests can assert which git invocations
+// the Client made. Responses are looked up by exact argument tuple
+// (joined with a space); use this rather than regex matching so tests
+// fail loudly when the Client changes its argv.
+type fakeRunner struct {
+	calls     [][]string
+	responses map[string]fakeResponse
+	// fallback is returned when no responses entry matches; useful when
+	// a test only cares about a subset of the calls.
+	fallback fakeResponse
+}
+
+type fakeResponse struct {
+	stdout string
+	stderr string
+	err    error
+}
+
+func (f *fakeRunner) Run(_ context.Context, args ...string) (string, string, error) {
+	f.calls = append(f.calls, append([]string(nil), args...))
+	key := join(args)
+	if r, ok := f.responses[key]; ok {
+		return r.stdout, r.stderr, r.err
+	}
+	return f.fallback.stdout, f.fallback.stderr, f.fallback.err
+}
+
+func join(args []string) string {
+	out := ""
+	for i, a := range args {
+		if i > 0 {
+			out += " "
+		}
+		out += a
+	}
+	return out
+}
+
+// exitErr returns a real *exec.ExitError with the requested exit code,
+// so tests can drive the same ExitErrorOf walk that production uses.
+// We can't construct *exec.ExitError directly (its internals are
+// unexported) so we shell out to a guaranteed-to-fail helper.
+func exitErr(code int) error {
+	// Use exec.Command with a guaranteed-to-fail program to obtain a
+	// real *exec.ExitError so ExitErrorOf works as in production.
+	cmd := exec.Command("false")
+	if code != 1 {
+		// `false` always exits 1; for other codes we use sh -c.
+		cmd = exec.Command("sh", "-c", "exit "+itoa(code))
+	}
+	err := cmd.Run()
+	if err == nil {
+		// Should never happen — protect tests from silent regressions.
+		panic("expected non-nil error from forced-failure command")
+	}
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
+		panic("expected *exec.ExitError from forced-failure command")
+	}
+	return ee
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
+}
+
+func TestCurrentBranch(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"symbolic-ref --short HEAD": {stdout: "feature/a\n"},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.CurrentBranch(context.Background())
+	if err != nil {
+		t.Fatalf("CurrentBranch: %v", err)
+	}
+	if got != "feature/a" {
+		t.Fatalf("got %q, want %q", got, "feature/a")
+	}
+	if len(r.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(r.calls))
+	}
+}
+
+func TestBranchExists(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"exists", nil, true},
+		{"missing", exitErr(1), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &fakeRunner{fallback: fakeResponse{err: tc.err}}
+			c := NewWithRunner(r)
+			got, err := c.BranchExists(context.Background(), "feat/x")
+			if err != nil {
+				t.Fatalf("BranchExists: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsClean(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"status --porcelain --untracked-files=no": {stdout: ""},
+		},
+	}
+	c := NewWithRunner(r)
+	clean, err := c.IsClean(context.Background())
+	if err != nil {
+		t.Fatalf("IsClean: %v", err)
+	}
+	if !clean {
+		t.Fatalf("expected clean tree")
+	}
+}
+
+func TestConfigGetMissingKey(t *testing.T) {
+	r := &fakeRunner{fallback: fakeResponse{err: exitErr(1)}}
+	c := NewWithRunner(r)
+	val, ok, err := c.ConfigGet(context.Background(), "branch.foo.stac-man-parent")
+	if err != nil {
+		t.Fatalf("ConfigGet: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected ok=false for missing key")
+	}
+	if val != "" {
+		t.Fatalf("expected empty value, got %q", val)
+	}
+}
+
+func TestConfigUnsetIgnoresMissing(t *testing.T) {
+	r := &fakeRunner{fallback: fakeResponse{err: exitErr(5)}}
+	c := NewWithRunner(r)
+	if err := c.ConfigUnset(context.Background(), "branch.foo.bar"); err != nil {
+		t.Fatalf("ConfigUnset returned %v, want nil for exit-5", err)
+	}
+}
+
+func TestConfigListPrefixFilter(t *testing.T) {
+	out := "core.bare=false\n" +
+		"branch.feat-a.stac-man-parent=main\n" +
+		"branch.feat-a.stac-man-parent-sha=abc123\n" +
+		"branch.feat-b.stac-man-parent=feat-a\n" +
+		"user.name=alice\n"
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"config --local --list": {stdout: out},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.ConfigList(context.Background(), "branch.")
+	if err != nil {
+		t.Fatalf("ConfigList: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 keys, got %d: %v", len(got), got)
+	}
+	if got["branch.feat-a.stac-man-parent"] != "main" {
+		t.Fatalf("unexpected value: %v", got)
+	}
+}
+
+func TestPushUsesForceWithLease(t *testing.T) {
+	r := &fakeRunner{}
+	c := NewWithRunner(r)
+	if err := c.Push(context.Background(), "feat-a", true); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+	if len(r.calls) != 1 {
+		t.Fatalf("expected 1 call")
+	}
+	got := r.calls[0]
+	want := []string{"push", "--set-upstream", "--force-with-lease", "origin", "feat-a"}
+	if !equalSlices(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestPushPlain(t *testing.T) {
+	r := &fakeRunner{}
+	c := NewWithRunner(r)
+	if err := c.Push(context.Background(), "feat-a", false); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+	got := r.calls[0]
+	want := []string{"push", "--set-upstream", "origin", "feat-a"}
+	if !equalSlices(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestLocalBranches(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"for-each-ref --format=%(refname:short) refs/heads/": {stdout: "main\nfeat-a\nfeat-b\n"},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.LocalBranches(context.Background())
+	if err != nil {
+		t.Fatalf("LocalBranches: %v", err)
+	}
+	want := []string{"main", "feat-a", "feat-b"}
+	if !equalSlices(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestRebaseArgs(t *testing.T) {
+	r := &fakeRunner{}
+	c := NewWithRunner(r)
+	if err := c.Rebase(context.Background(), "newParentSha", "oldParentSha", "feat-b"); err != nil {
+		t.Fatalf("Rebase: %v", err)
+	}
+	want := []string{"rebase", "--onto", "newParentSha", "oldParentSha", "feat-b"}
+	if !equalSlices(r.calls[0], want) {
+		t.Fatalf("got %v, want %v", r.calls[0], want)
+	}
+}
+
+func equalSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
