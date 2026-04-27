@@ -300,6 +300,32 @@ func (c *Client) FetchAll(ctx context.Context) error {
 	return err
 }
 
+// Pull runs `git pull --ff-only origin <branch>`. We refuse non-ff
+// pulls so trunk updates never produce surprise merge commits.
+func (c *Client) Pull(ctx context.Context, branch string) error {
+	_, _, err := c.r.Run(ctx, "pull", "--ff-only", "origin", branch)
+	return err
+}
+
+// CountCommitsAhead returns how many commits `branch` has that are
+// not in `base`. Used by `sm sync` to detect branches whose work has
+// been merged (count == 0 means fully absorbed by trunk).
+func (c *Client) CountCommitsAhead(ctx context.Context, branch, base string) (int, error) {
+	out, _, err := c.r.Run(ctx, "rev-list", "--count", base+".."+branch)
+	if err != nil {
+		return 0, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return 0, nil
+	}
+	var n int
+	if _, err := fmt.Sscanf(out, "%d", &n); err != nil {
+		return 0, fmt.Errorf("parsing rev-list count %q: %w", out, err)
+	}
+	return n, nil
+}
+
 // Push pushes branch to origin. When forceLease is true it uses
 // --force-with-lease (never plain --force) which is what `sm submit`
 // needs after a restack rewrites history.
