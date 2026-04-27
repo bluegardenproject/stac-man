@@ -21,9 +21,17 @@ func init() {
 			"is rebased so they pick up the new tip.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
+			// `--amend` defaults to true, but if the user passed `-c`
+			// without explicitly passing `--amend`, treat amend as off
+			// so the two flags don't fight each other.
+			amendExplicit := c.Flags().Changed("amend")
+			effectiveAmend := amend
+			if commit && !amendExplicit {
+				effectiveAmend = false
+			}
 			err := newService().Modify(c.Context(), service.ModifyOptions{
 				Commit:   commit,
-				Amend:    amend,
+				Amend:    effectiveAmend,
 				StageAll: stage,
 				Message:  message,
 			})

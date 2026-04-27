@@ -105,6 +105,29 @@ func (s *Service) Modify(ctx context.Context, opts ModifyOptions) error {
 		return errors.New("--commit requires -m <message>")
 	}
 
+	// Guard: amending when the branch has no commits of its own would
+	// rewrite a commit that belongs to the parent (or trunk) — silently
+	// pulling its changes into this branch under a new SHA. Detect this
+	// up front and tell the user to use -c.
+	if opts.Amend {
+		base := trunk
+		if meta, ok, err := s.Store.GetBranch(ctx, current); err != nil {
+			return err
+		} else if ok {
+			base = meta.Parent
+		}
+		ahead, err := s.G.CountCommitsAhead(ctx, current, base)
+		if err != nil {
+			return fmt.Errorf("checking commits ahead of %s: %w", base, err)
+		}
+		if ahead == 0 {
+			return fmt.Errorf(
+				"cannot amend: branch %q has no commits of its own (tip matches %s). Use `sm modify -c -m \"...\"` to add the first commit.",
+				current, base,
+			)
+		}
+	}
+
 	s.recordHistory(ctx, "modify", current, branchAndDescendants(ctx, s, current))
 
 	if opts.StageAll {
