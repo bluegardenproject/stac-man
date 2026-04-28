@@ -37,4 +37,19 @@ func renderSyncReport(r service.SyncReport) {
 			fmt.Println("  " + ui.Render(theme.Dimmed, b))
 		}
 	}
+	if len(r.RetargetedPRs) > 0 {
+		fmt.Println(ui.Render(theme.Header, "retargeted PR bases on GitHub:"))
+		for _, rp := range r.RetargetedPRs {
+			line := fmt.Sprintf("  #%d (%s) → %s", rp.PR, rp.Branch, rp.NewBase)
+			if rp.Err != "" {
+				fmt.Printf("  %s %s — %s\n",
+					ui.Render(theme.Warn, "!"),
+					line[2:],
+					ui.Render(theme.Dimmed, rp.Err),
+				)
+				continue
+			}
+			fmt.Println(ui.Render(theme.Accent, line))
+		}
+	}
 }

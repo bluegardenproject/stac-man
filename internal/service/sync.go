@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/philipptpunkt/stac-man/internal/gh"
 	"github.com/philipptpunkt/stac-man/internal/restack"
 	"github.com/philipptpunkt/stac-man/internal/stack"
 )
@@ -14,8 +15,59 @@ import (
 // layer) decides how to render it.
 type SyncReport struct {
 	Trunk           string
-	MergedBranches  []string // deleted because their commits are in trunk
-	RestackedBranch string   // root of any restack performed (empty if none)
+	MergedBranches  []string       // deleted because their commits are in trunk
+	RetargetedPRs   []RetargetedPR // child PR bases updated on GitHub after a parent merged
+	RestackedBranch string         // root of any restack performed (empty if none)
+}
+
+// RetargetedPR records one `gh pr edit --base` call attempted while
+// cleaning up after a merged branch. Err is empty on success and
+// otherwise carries the failure reason — sync deliberately keeps
+// these errors non-fatal so a flaky network or missing gh auth
+// doesn't undo the local re-parenting we already finished.
+type RetargetedPR struct {
+	Branch  string
+	PR      int
+	NewBase string
+	Err     string
+}
+
+// retargetEntry is the unit-testable plan of "if local re-parenting
+// succeeded, here is the matching `gh pr edit` call we would issue".
+// Kept separate from RetargetedPR so the planner stays a pure function
+// of the stack graph and never touches the network.
+type retargetEntry struct {
+	Branch  string
+	PR      int
+	NewBase string
+}
+
+// retargetPlan returns the child-PR retargets that follow from
+// removing `merged` and re-parenting its direct children onto
+// `newParent`. Children without an associated PR (`PR == 0`) are
+// filtered out — the live runner can't retarget what doesn't exist
+// on GitHub yet. We deliberately don't try to dedupe against an
+// already-correct base here: `gh pr edit --base` is idempotent and
+// a single extra round-trip per merged branch is cheaper than
+// fetching every child's current base just to skip it.
+//
+// The function is pure — pass in the loaded graph and let the caller
+// decide when to consult the network. This is the seam tests use to
+// lock down the mapping between merged-branch cleanup and PR
+// retargeting without spinning up a fake gh runner.
+func retargetPlan(g *stack.Graph, merged, newParent string) []retargetEntry {
+	var out []retargetEntry
+	for _, child := range g.ChildrenOf(merged) {
+		if child.PR == 0 {
+			continue
+		}
+		out = append(out, retargetEntry{
+			Branch:  child.Name,
+			PR:      child.PR,
+			NewBase: newParent,
+		})
+	}
+	return out
 }
 
 // Sync fetches trunk, fast-forwards the local trunk, deletes branches
@@ -72,9 +124,27 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 	}
 	r.MergedBranches = merged
 
+	// Construct the gh client once, lazily — only when there is at
+	// least one merged branch with child PRs to retarget. Avoids
+	// requiring `gh` auth on every sync just to get past this point.
+	var ghClient *gh.Client
 	for _, b := range merged {
-		if err := s.untrackAndDelete(ctx, g, b, trunk); err != nil {
+		retargets, err := s.untrackAndDelete(ctx, g, b, trunk)
+		if err != nil {
 			return r, fmt.Errorf("untracking merged branch %s: %w", b, err)
+		}
+		if len(retargets) == 0 {
+			continue
+		}
+		if ghClient == nil {
+			ghClient = gh.New("")
+		}
+		for _, e := range retargets {
+			rp := RetargetedPR{Branch: e.Branch, PR: e.PR, NewBase: e.NewBase}
+			if err := ghClient.EditPR(ctx, e.PR, gh.EditPROptions{Base: e.NewBase}); err != nil {
+				rp.Err = err.Error()
+			}
+			r.RetargetedPRs = append(r.RetargetedPRs, rp)
 		}
 	}
 
@@ -166,33 +236,42 @@ func (s *Service) detectMergedBranches(ctx context.Context, g *stack.Graph, trun
 // untrackAndDelete removes a merged branch from the stack and from
 // git. Children of the merged branch are re-parented onto its parent
 // (or trunk).
-func (s *Service) untrackAndDelete(ctx context.Context, g *stack.Graph, branch, trunk string) error {
+//
+// Returns the list of PR base retargets the caller should issue
+// against GitHub. We compute the plan from the stack graph BEFORE
+// mutating it so callers don't need to re-load the graph just to
+// figure out which children had PRs.
+func (s *Service) untrackAndDelete(ctx context.Context, g *stack.Graph, branch, trunk string) ([]retargetEntry, error) {
 	parent := trunk
 	if b, ok := g.Get(branch); ok && b.Parent != "" {
 		parent = b.Parent
 	}
 	parentSHA, err := s.G.RevParse(ctx, parent)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	retargets := retargetPlan(g, branch, parent)
 	for _, child := range g.ChildrenOf(branch) {
 		meta, _, err := s.Store.GetBranch(ctx, child.Name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		meta.Parent = parent
 		meta.ParentSHA = parentSHA
 		if err := s.Store.SetBranch(ctx, child.Name, meta); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if err := s.Store.UnsetBranch(ctx, branch); err != nil {
-		return err
+		return nil, err
 	}
 	// Use force delete since the branch may not be merged into HEAD
 	// (we just hopped to trunk so it should be, but force is safe
 	// once we've confirmed CountCommitsAhead == 0).
-	return s.G.DeleteBranch(ctx, branch, true)
+	if err := s.G.DeleteBranch(ctx, branch, true); err != nil {
+		return nil, err
+	}
+	return retargets, nil
 }
 
 func contains(s []string, x string) bool {
