@@ -14,6 +14,7 @@ type DoctorReport struct {
 	TrackedCount   int
 	NeedsRestack   []string // branches whose ParentSHA is stale
 	StaleSHA       []string // branches whose recorded parent commit doesn't exist
+	DriftedParent  []string // recorded parent SHA exists but is not in the branch's history
 	UntrackedRoots []string // local branches that look like stack roots but aren't tracked
 	Issues         []string // graph-level errors (cycles, missing parents)
 }
@@ -51,10 +52,16 @@ func (s *Service) Doctor(ctx context.Context) (DoctorReport, error) {
 		if b.Parent == "" {
 			continue
 		}
-		// Verify the recorded parent SHA still exists.
+		// Verify the recorded parent SHA still exists, and — if it does —
+		// that it's actually reachable from this branch's tip. The latter
+		// catches the case where a misuse of `git commit --amend` (or an
+		// external tool) rewrites history so the recorded SHA still
+		// exists somewhere in the repo but no longer in *this* branch.
 		if b.ParentSHA != "" {
 			if _, err := s.G.RevParse(ctx, b.ParentSHA); err != nil {
 				r.StaleSHA = append(r.StaleSHA, fmt.Sprintf("%s (recorded parent SHA %s no longer exists)", b.Name, short(b.ParentSHA)))
+			} else if ok, err := s.G.IsAncestor(ctx, b.ParentSHA, b.Name); err == nil && !ok {
+				r.DriftedParent = append(r.DriftedParent, fmt.Sprintf("%s (recorded parent SHA %s is not in this branch's history)", b.Name, short(b.ParentSHA)))
 			}
 		}
 		// Detect stale ParentSHA: parent's tip has moved.
