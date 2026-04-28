@@ -68,6 +68,7 @@ const (
 type PR struct {
 	Number  int
 	Title   string
+	Body    string
 	State   PRState
 	IsDraft bool
 	URL     string
@@ -82,7 +83,7 @@ func (c *Client) PRForBranch(ctx context.Context, branch string) (PR, bool, erro
 		"--head", branch,
 		"--state", "all",
 		"--limit", "1",
-		"--json", "number,title,state,isDraft,url,baseRefName,headRefName",
+		"--json", "number,title,body,state,isDraft,url,baseRefName,headRefName",
 	)
 	if err != nil {
 		return PR{}, false, err
@@ -90,6 +91,7 @@ func (c *Client) PRForBranch(ctx context.Context, branch string) (PR, bool, erro
 	var raw []struct {
 		Number      int    `json:"number"`
 		Title       string `json:"title"`
+		Body        string `json:"body"`
 		State       string `json:"state"`
 		IsDraft     bool   `json:"isDraft"`
 		URL         string `json:"url"`
@@ -106,6 +108,7 @@ func (c *Client) PRForBranch(ctx context.Context, branch string) (PR, bool, erro
 	return PR{
 		Number:  r.Number,
 		Title:   r.Title,
+		Body:    r.Body,
 		State:   PRState(strings.ToUpper(r.State)),
 		IsDraft: r.IsDraft,
 		URL:     r.URL,
