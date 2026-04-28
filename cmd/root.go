@@ -86,3 +86,11 @@ func Execute(ctx context.Context) error {
 	root.SetContext(ctx)
 	return root.Execute()
 }
+
+// Root returns a freshly-built command tree without executing it. It's
+// intended for tooling that needs to introspect the cobra surface
+// (e.g. tools/docscan dumps it as JSON for the docs-drift-audit skill).
+// Each call returns a new tree; callers should not assume identity.
+func Root() *cobra.Command {
+	return newRootCmd()
+}
