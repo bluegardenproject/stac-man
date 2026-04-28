@@ -274,6 +274,67 @@ func TestLocalBranches(t *testing.T) {
 	}
 }
 
+// TestRemoteMatchesLocalEqual locks in B10's idempotent-push seam:
+// when local and `refs/remotes/origin/<branch>` resolve to the same
+// SHA, the helper reports true so `sm submit`'s push loop knows to
+// skip a redundant force-with-lease.
+func TestRemoteMatchesLocalEqual(t *testing.T) {
+	const sha = "deadbeefcafebabedeadbeefcafebabedeadbeef"
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"rev-parse --verify feat-a^{commit}":                     {stdout: sha + "\n"},
+			"rev-parse --verify refs/remotes/origin/feat-a^{commit}": {stdout: sha + "\n"},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.RemoteMatchesLocal(context.Background(), "feat-a")
+	if err != nil {
+		t.Fatalf("RemoteMatchesLocal: %v", err)
+	}
+	if !got {
+		t.Fatalf("RemoteMatchesLocal = false, want true (same SHAs)")
+	}
+}
+
+func TestRemoteMatchesLocalDiverged(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"rev-parse --verify feat-a^{commit}":                     {stdout: "aaaa\n"},
+			"rev-parse --verify refs/remotes/origin/feat-a^{commit}": {stdout: "bbbb\n"},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.RemoteMatchesLocal(context.Background(), "feat-a")
+	if err != nil {
+		t.Fatalf("RemoteMatchesLocal: %v", err)
+	}
+	if got {
+		t.Fatalf("RemoteMatchesLocal = true, want false (different SHAs)")
+	}
+}
+
+// A brand-new branch that has never been pushed has no
+// `refs/remotes/origin/<branch>` ref. rev-parse exits non-zero in
+// that case; the helper must treat it as "not in sync" without
+// bubbling the error so the caller falls through to the actual
+// push.
+func TestRemoteMatchesLocalMissingRemoteRef(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"rev-parse --verify feat-new^{commit}":                     {stdout: "aaaa\n"},
+			"rev-parse --verify refs/remotes/origin/feat-new^{commit}": {err: exitErr(1)},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.RemoteMatchesLocal(context.Background(), "feat-new")
+	if err != nil {
+		t.Fatalf("RemoteMatchesLocal returned %v, want nil for missing remote ref", err)
+	}
+	if got {
+		t.Fatalf("RemoteMatchesLocal = true, want false when remote ref missing")
+	}
+}
+
 func TestRebaseArgs(t *testing.T) {
 	r := &fakeRunner{}
 	c := NewWithRunner(r)

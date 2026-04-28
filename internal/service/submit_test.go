@@ -106,31 +106,110 @@ func TestSubmissionTargetsStackFromTopIncludesAncestors(t *testing.T) {
 	}
 }
 
-// TestSubmissionTargetsStopsAtFirstSubmittedAncestor pins the
-// idempotency guard: the ancestor walk stops at the first parent
-// that already has a PR so a re-run never accidentally re-pushes
-// merged stacks below that point.
-func TestSubmissionTargetsStopsAtFirstSubmittedAncestor(t *testing.T) {
-	// feat-a has PR #2 (already submitted, maybe merged elsewhere);
-	// feat-b is unsubmitted; feat-c is current (also unsubmitted).
+// TestSubmissionTargetsStackIncludesSubmittedAncestor pins B10:
+// `--stack` no longer stops at the first PR'd ancestor. Earlier
+// versions did, treating "PR exists" as "leave the ancestor alone";
+// the live data in B10 showed that policy left mid-stack rewrites
+// stranded on origin (any merge upstream cascades a restack to
+// every descendant, so previously-submitted ancestors of `current`
+// silently diverge from origin and break mergeability on GitHub
+// the moment a leaf is re-pushed). Idempotency now lives in the
+// push loop's `RemoteMatchesLocal` check, not in the target list.
+func TestSubmissionTargetsStackIncludesSubmittedAncestor(t *testing.T) {
+	// feat-a has PR #2 (already submitted, maybe rebased after a
+	// merge upstream); feat-b is unsubmitted; feat-c is current.
 	g := buildSubmitGraph(t, map[string]int{"feat-a": 2})
 	got := branchNames(submissionTargets(g, "feat-c", true))
-	// feat-a is excluded — it has a PR. feat-b is unsubmitted and
-	// directly above current, so it gets prepended. Then descendants.
-	if want := []string{"feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
+	if want := []string{"feat-a", "feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
 		t.Fatalf("targets = %v, want %v", got, want)
 	}
 }
 
-// TestSubmissionTargetsImmediateParentSubmitted pins the boundary:
-// if the current branch's IMMEDIATE parent already has a PR, no
-// ancestors are prepended at all (we don't reach over a submitted
-// stack).
-func TestSubmissionTargetsImmediateParentSubmitted(t *testing.T) {
+// TestSubmissionTargetsStackIncludesSubmittedImmediateParent locks
+// in B10's "always include all ancestors" rule even when the
+// immediate parent already has a PR — the exact shape that used to
+// truncate the target list to just `current` and its descendants.
+func TestSubmissionTargetsStackIncludesSubmittedImmediateParent(t *testing.T) {
 	g := buildSubmitGraph(t, map[string]int{"feat-b": 3})
 	got := branchNames(submissionTargets(g, "feat-c", true))
-	if want := []string{"feat-c", "feat-d"}; !equalStrings(got, want) {
+	if want := []string{"feat-a", "feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
 		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestSubmissionTargetsStackEverythingPRd pins the most extreme
+// re-run scenario: every branch already has a PR. With B10 we
+// still target the whole stack, and the push loop is responsible
+// for being a no-op when origin matches local.
+func TestSubmissionTargetsStackEverythingPRd(t *testing.T) {
+	g := buildSubmitGraph(t, map[string]int{
+		"feat-a": 1, "feat-b": 2, "feat-c": 3, "feat-d": 4,
+	})
+	got := branchNames(submissionTargets(g, "feat-c", true))
+	if want := []string{"feat-a", "feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestDivergedStackmatesReportsBranchesNotInTargets pins B10's
+// plain-submit warning. From `feat-c`, plain submit only targets
+// `feat-c` itself; if any other tracked branch's local tip differs
+// from origin's tracking ref, the helper must surface it so the
+// user knows to follow up with `sm submit --stack`.
+func TestDivergedStackmatesReportsBranchesNotInTargets(t *testing.T) {
+	g := buildSubmitGraph(t, map[string]int{"feat-a": 1, "feat-b": 2, "feat-c": 3, "feat-d": 4})
+	// Drive RemoteMatchesLocal: feat-a is in sync; feat-b and
+	// feat-d are diverged. feat-c is the current branch (already
+	// in targets), so even if it diverged we wouldn't list it.
+	r := &fakeRunner{
+		responses: map[string]string{
+			// feat-a: in sync.
+			"rev-parse --verify feat-a^{commit}":                     "sha-a",
+			"rev-parse --verify refs/remotes/origin/feat-a^{commit}": "sha-a",
+			// feat-b: diverged.
+			"rev-parse --verify feat-b^{commit}":                     "sha-b-local",
+			"rev-parse --verify refs/remotes/origin/feat-b^{commit}": "sha-b-remote",
+			// feat-c: in sync (but in targets so should not appear).
+			"rev-parse --verify feat-c^{commit}":                     "sha-c",
+			"rev-parse --verify refs/remotes/origin/feat-c^{commit}": "sha-c",
+			// feat-d: diverged.
+			"rev-parse --verify feat-d^{commit}":                     "sha-d-local",
+			"rev-parse --verify refs/remotes/origin/feat-d^{commit}": "sha-d-remote",
+		},
+	}
+	svc := &Service{G: git.NewWithRunner(r), Store: memory.New()}
+	current := []stack.Branch{}
+	if b, ok := g.Get("feat-c"); ok {
+		current = []stack.Branch{b}
+	}
+
+	got := svc.divergedStackmates(context.Background(), g, "feat-c", current)
+	wantNames := map[string]int{"feat-b": 2, "feat-d": 4}
+	if len(got) != len(wantNames) {
+		t.Fatalf("divergedStackmates = %#v, want %d entries (%v)", got, len(wantNames), wantNames)
+	}
+	for _, d := range got {
+		pr, ok := wantNames[d.Branch]
+		if !ok {
+			t.Fatalf("unexpected branch %q in result", d.Branch)
+		}
+		if d.PR != pr {
+			t.Fatalf("branch %q PR = %d, want %d", d.Branch, d.PR, pr)
+		}
+	}
+}
+
+// TestDivergedStackmatesIgnoresInSync pins the negative case: when
+// every other branch is already in sync with origin, plain submit
+// emits no warning.
+func TestDivergedStackmatesIgnoresInSync(t *testing.T) {
+	g := buildSubmitGraph(t, nil)
+	r := &fakeRunner{fallback: "same-sha"}
+	svc := &Service{G: git.NewWithRunner(r), Store: memory.New()}
+	currentTarget, _ := g.Get("feat-c")
+	got := svc.divergedStackmates(context.Background(), g, "feat-c", []stack.Branch{currentTarget})
+	if len(got) != 0 {
+		t.Fatalf("divergedStackmates = %#v, want empty", got)
 	}
 }
 
