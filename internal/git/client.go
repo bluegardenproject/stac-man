@@ -354,6 +354,29 @@ type Commit struct {
 	Subject string
 }
 
+// CommitFullMessage returns the subject line and the body of the
+// commit at sha. Subject is the first line; body is everything after
+// the blank line that follows the subject (trimmed of trailing
+// whitespace). Both fields can be empty — sha must exist.
+//
+// Used by `sm submit` to seed a PR's title and body from the commit
+// the branch defines, instead of synthesising both from the branch
+// name.
+func (c *Client) CommitFullMessage(ctx context.Context, sha string) (subject, body string, err error) {
+	// %s + NUL + %b lets us split unambiguously even when the body
+	// contains newlines or tabs.
+	out, _, err := c.r.Run(ctx, "log", "-1", "--format=%s%x00%b", sha)
+	if err != nil {
+		return "", "", err
+	}
+	out = strings.TrimRight(out, "\n")
+	idx := strings.IndexByte(out, 0)
+	if idx < 0 {
+		return strings.TrimSpace(out), "", nil
+	}
+	return strings.TrimSpace(out[:idx]), strings.TrimSpace(out[idx+1:]), nil
+}
+
 // LogBetween returns the commits unique to head that aren't in base,
 // in oldest-first order. Each entry has the full SHA and the commit's
 // subject line.

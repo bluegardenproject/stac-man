@@ -124,15 +124,30 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			base = trunk
 		}
 
+		derivedTitle, derivedBody := s.derivePRMeta(ctx, b.Name, base)
+
 		existing, ok, err := client.PRForBranch(ctx, b.Name)
 		if err != nil {
 			return r, err
 		}
 		if ok {
-			// Update base if it drifted.
+			edits := gh.EditPROptions{}
 			if existing.Base != base {
-				if err := client.EditPR(ctx, existing.Number, gh.EditPROptions{Base: base}); err != nil {
-					return r, fmt.Errorf("retargeting #%d to %s: %w", existing.Number, base, err)
+				edits.Base = base
+			}
+			// Non-destructive title/body update: only overwrite when
+			// the existing values still look like sm's auto-defaults
+			// (synthesised title from branch name, empty body) so we
+			// never clobber a manually-edited PR description.
+			if derivedTitle != "" && existing.Title == buildPRTitle(b.Name) && existing.Title != derivedTitle {
+				edits.Title = derivedTitle
+			}
+			if derivedBody != "" && strings.TrimSpace(existing.Body) == "" {
+				edits.Body = derivedBody
+			}
+			if edits.Title != "" || edits.Body != "" || edits.Base != "" {
+				if err := client.EditPR(ctx, existing.Number, edits); err != nil {
+					return r, fmt.Errorf("editing #%d: %w", existing.Number, err)
 				}
 			}
 			r.Updated = append(r.Updated, SubmitPR{Branch: b.Name, Number: existing.Number, URL: existing.URL})
@@ -140,8 +155,14 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			continue
 		}
 
-		title := buildPRTitle(b.Name)
+		title := derivedTitle
+		if title == "" {
+			title = buildPRTitle(b.Name)
+		}
 		body := opts.Body
+		if body == "" {
+			body = derivedBody
+		}
 		num, err := client.CreatePR(ctx, gh.CreatePROptions{
 			Title: title,
 			Body:  body,
@@ -157,6 +178,35 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 	}
 
 	return r, nil
+}
+
+// derivePRMeta builds a PR title and body from the commits unique to
+// branch (relative to base). Title is the first commit's subject;
+// body is the first commit's body when the branch carries a single
+// commit, or a bulleted list of subjects otherwise. Returns empty
+// strings on any failure — callers fall back to buildPRTitle and the
+// user-supplied --body.
+func (s *Service) derivePRMeta(ctx context.Context, branch, base string) (title, body string) {
+	commits, err := s.G.LogBetween(ctx, base, branch)
+	if err != nil || len(commits) == 0 {
+		return "", ""
+	}
+	title = commits[0].Subject
+
+	if len(commits) == 1 {
+		_, b, err := s.G.CommitFullMessage(ctx, commits[0].SHA)
+		if err != nil {
+			return title, ""
+		}
+		return title, b
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Commits in this PR:\n")
+	for _, c := range commits {
+		fmt.Fprintf(&sb, "- %s\n", c.Subject)
+	}
+	return title, strings.TrimRight(sb.String(), "\n")
 }
 
 // persistPR records the PR number on the branch metadata so future
