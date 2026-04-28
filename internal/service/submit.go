@@ -24,10 +24,20 @@ type SubmitOptions struct {
 
 // SubmitReport summarizes what Submit did per branch.
 type SubmitReport struct {
-	Pushed  []string
-	Created []SubmitPR
-	Updated []SubmitPR
-	Skipped []SubmitSkip
+	Pushed             []string
+	SkippedPushes      []string // origin already at local tip — no push issued
+	Created            []SubmitPR
+	Updated            []SubmitPR
+	Skipped            []SubmitSkip
+	DivergedStackmates []DivergedBranch // tracked branches with stale origin not in target list
+}
+
+// DivergedBranch records a tracked branch whose local tip differs
+// from origin's, surfaced from plain `sm submit` so the user knows
+// the rest of the stack needs a `--stack` push to catch up.
+type DivergedBranch struct {
+	Branch string
+	PR     int // 0 if not yet submitted
 }
 
 // SubmitPR is a per-branch PR result.
@@ -100,12 +110,25 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			}
 		}
 
-		// Force-with-lease because a previous restack will have
-		// rewritten history; plain push would be rejected.
-		if err := s.G.Push(ctx, b.Name, true); err != nil {
-			return r, fmt.Errorf("pushing %s: %w", b.Name, err)
+		// Idempotent push: skip when origin already has our tip.
+		// This is what makes `--stack` always-include-the-whole-
+		// chain cheap. We compare local rev-parse to the local
+		// tracking ref `origin/<branch>`; we already fetched at
+		// the start of any sync, but for `submit` the user may not
+		// have. That's fine — a stale tracking ref that says "in
+		// sync" while origin moved out from under us is safe to
+		// no-op on; the very next `git push --force-with-lease`
+		// would catch the divergence anyway.
+		if inSync, err := s.G.RemoteMatchesLocal(ctx, b.Name); err == nil && inSync {
+			r.SkippedPushes = append(r.SkippedPushes, b.Name)
+		} else {
+			// Force-with-lease because a previous restack will have
+			// rewritten history; plain push would be rejected.
+			if err := s.G.Push(ctx, b.Name, true); err != nil {
+				return r, fmt.Errorf("pushing %s: %w", b.Name, err)
+			}
+			r.Pushed = append(r.Pushed, b.Name)
 		}
-		r.Pushed = append(r.Pushed, b.Name)
 	}
 
 	// Now open / update PRs.
@@ -171,7 +194,44 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		s.persistPR(ctx, b.Name, num)
 	}
 
+	// Plain `sm submit` only refreshed the current branch. If any
+	// other tracked branch in the same stack has diverged from
+	// origin (typically because `sm sync`'s restack cascade
+	// rewrote history after a merge), the user has no signal
+	// that those branches will turn into `CONFLICTING` on GitHub
+	// the moment a single descendant gets re-pushed. Surface them
+	// here so the user can `sm submit --stack` from the bottom
+	// without having to discover the gap by hitting it.
+	if !opts.Stack {
+		r.DivergedStackmates = s.divergedStackmates(ctx, g, current, targets)
+	}
+
 	return r, nil
+}
+
+// divergedStackmates returns tracked branches whose local tip
+// differs from origin's local tracking ref, excluding (a) trunk and
+// (b) anything in `targets` (which were either pushed or
+// intentionally skipped). Best-effort — a branch with no remote
+// tracking ref or a transient git error simply doesn't appear in
+// the list rather than failing the whole submit.
+func (s *Service) divergedStackmates(ctx context.Context, g *stack.Graph, current string, targets []stack.Branch) []DivergedBranch {
+	inTargets := make(map[string]bool, len(targets))
+	for _, t := range targets {
+		inTargets[t.Name] = true
+	}
+	var out []DivergedBranch
+	for _, b := range g.Branches() {
+		if b.Name == g.Trunk || inTargets[b.Name] {
+			continue
+		}
+		inSync, err := s.G.RemoteMatchesLocal(ctx, b.Name)
+		if err != nil || inSync {
+			continue
+		}
+		out = append(out, DivergedBranch{Branch: b.Name, PR: b.PR})
+	}
+	return out
 }
 
 // derivePRMeta builds a PR title and body from the commits unique to
@@ -236,28 +296,27 @@ func submissionTargets(g *stack.Graph, current string, wholeStack bool) []stack.
 		return []stack.Branch{b}
 	}
 
+	// `--stack` targets the entire chain in trunk-toward-leaf order:
+	// every ancestor of `current`, then `current` itself, then every
+	// descendant. We deliberately do NOT filter ancestors by PR
+	// state — earlier versions stopped at the first PR'd ancestor
+	// (B7) to keep re-runs cheap, but that left mid-stack rewrites
+	// stranded on origin: after a merge of an ancestor, `sm sync`
+	// rebases every descendant locally and the recorded PR'd
+	// branches above `current` end up out of sync with origin,
+	// silently breaking mergeability on GitHub.
+	//
+	// Idempotency now lives in the push loop instead — it skips
+	// `git push` for branches whose origin ref already matches the
+	// local tip. That makes "always include the whole stack" cheap
+	// to re-run while ensuring nothing gets left stale, which is
+	// what users coming from Graphite expect from `gt submit --stack`.
+	ancestors := g.Ancestors(current) // immediate-parent first
 	descendants := g.TopoOrderFrom(current)
 
-	// Ancestors() yields immediate-parent first, then walks up.
-	// Collect ancestors with no PR yet; stop at the first one that
-	// has been submitted before so we don't reach across stack
-	// boundaries into work that's already in review.
-	ancestors := g.Ancestors(current)
-	var unsubmitted []stack.Branch
-	for _, a := range ancestors {
-		if a.PR > 0 {
-			break
-		}
-		unsubmitted = append(unsubmitted, a)
-	}
-
-	// Reverse unsubmitted so callers see trunk-toward-current order,
-	// then concatenate descendants. The push loop later relies on
-	// parents-before-children ordering so each PR's base ref already
-	// exists on origin by the time we open the PR.
-	out := make([]stack.Branch, 0, len(unsubmitted)+len(descendants))
-	for i := len(unsubmitted) - 1; i >= 0; i-- {
-		out = append(out, unsubmitted[i])
+	out := make([]stack.Branch, 0, len(ancestors)+len(descendants))
+	for i := len(ancestors) - 1; i >= 0; i-- {
+		out = append(out, ancestors[i])
 	}
 	out = append(out, descendants...)
 	return out

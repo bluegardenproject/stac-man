@@ -348,6 +348,31 @@ func (c *Client) Push(ctx context.Context, branch string, forceLease bool) error
 	return err
 }
 
+// RemoteMatchesLocal reports whether the local branch's tip is
+// identical to the local tracking ref `origin/<branch>`. Used by
+// `sm submit` to skip redundant `git push --force-with-lease`
+// invocations when the entire stack is being walked.
+//
+// Returns (false, nil) — not an error — when the tracking ref
+// doesn't exist (typical for a brand-new branch that has never
+// been pushed). Real git errors are surfaced to the caller; the
+// nil branch above is intentional: callers want to push in that
+// case, not abort.
+func (c *Client) RemoteMatchesLocal(ctx context.Context, branch string) (bool, error) {
+	localTip, err := c.RevParse(ctx, branch)
+	if err != nil {
+		return false, err
+	}
+	// Resolve the tracking ref directly. If it doesn't exist
+	// rev-parse exits non-zero — treat that as "not in sync"
+	// without bubbling the error up.
+	remoteTip, _, err := c.r.Run(ctx, "rev-parse", "--verify", "refs/remotes/origin/"+branch+"^{commit}")
+	if err != nil {
+		return false, nil
+	}
+	return strings.TrimSpace(remoteTip) == localTip, nil
+}
+
 // Commit describes a single commit.
 type Commit struct {
 	SHA     string

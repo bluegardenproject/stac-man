@@ -32,7 +32,7 @@ func init() {
 			return err
 		},
 	}
-	cmd.Flags().BoolVar(&stack, "stack", false, "submit the current branch and every descendant")
+	cmd.Flags().BoolVar(&stack, "stack", false, "submit every ancestor, the current branch, and every descendant (idempotent: branches already in sync with origin are not re-pushed)")
 	cmd.Flags().BoolVar(&draft, "draft", false, "create new PRs as drafts (existing PRs unchanged)")
 	cmd.Flags().StringVar(&body, "body", "", "PR body for newly-created PRs")
 
@@ -58,10 +58,27 @@ func renderSubmitReport(r service.SubmitReport) {
 			fmt.Printf("  %s %s\n", ui.Render(theme.PROpen, fmt.Sprintf("#%d", p.Number)), p.Branch)
 		}
 	}
+	if len(r.SkippedPushes) > 0 {
+		fmt.Println(ui.Render(theme.Header, "already in sync with origin:"))
+		for _, b := range r.SkippedPushes {
+			fmt.Println("  " + ui.Render(theme.Dimmed, b))
+		}
+	}
 	if len(r.Skipped) > 0 {
 		fmt.Println(ui.Render(theme.Warn, "skipped:"))
 		for _, s := range r.Skipped {
 			fmt.Printf("  %s — %s\n", s.Branch, ui.Render(theme.Dimmed, s.Reason))
 		}
+	}
+	if len(r.DivergedStackmates) > 0 {
+		fmt.Println(ui.Render(theme.Warn, "stack-mates diverged from origin:"))
+		for _, d := range r.DivergedStackmates {
+			label := d.Branch
+			if d.PR > 0 {
+				label = fmt.Sprintf("#%d %s", d.PR, d.Branch)
+			}
+			fmt.Println("  " + ui.Render(theme.Dimmed, label))
+		}
+		fmt.Println(ui.Render(theme.Dimmed, "  → run `sm submit --stack` from the bottom to refresh"))
 	}
 }
