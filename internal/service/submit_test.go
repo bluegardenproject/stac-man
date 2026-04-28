@@ -6,8 +6,145 @@ import (
 	"testing"
 
 	"github.com/philipptpunkt/stac-man/internal/git"
+	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/philipptpunkt/stac-man/internal/store"
 	"github.com/philipptpunkt/stac-man/internal/store/memory"
 )
+
+// buildSubmitGraph builds a stack with this shape so the B7 tests
+// can target several positions in the same graph without churning
+// setup boilerplate:
+//
+//	main
+//	└── feat-a
+//	    └── feat-b
+//	        └── feat-c
+//	            └── feat-d
+//
+// prs maps branch names to PR numbers (0 means "no PR yet"). Any
+// branch missing from prs gets PR=0.
+func buildSubmitGraph(t *testing.T, prs map[string]int) *stack.Graph {
+	t.Helper()
+	s := memory.New()
+	ctx := context.Background()
+	if err := s.SetRepo(ctx, store.RepoMeta{Trunk: "main", Version: 1}); err != nil {
+		t.Fatalf("SetRepo: %v", err)
+	}
+	chain := []struct {
+		name, parent string
+	}{
+		{"feat-a", "main"},
+		{"feat-b", "feat-a"},
+		{"feat-c", "feat-b"},
+		{"feat-d", "feat-c"},
+	}
+	for _, b := range chain {
+		if err := s.SetBranch(ctx, b.name, store.BranchMeta{Parent: b.parent, PR: prs[b.name]}); err != nil {
+			t.Fatalf("SetBranch %s: %v", b.name, err)
+		}
+	}
+	g, err := stack.Load(ctx, s)
+	if err != nil {
+		t.Fatalf("stack.Load: %v", err)
+	}
+	return g
+}
+
+func branchNames(targets []stack.Branch) []string {
+	out := make([]string, len(targets))
+	for i, b := range targets {
+		out[i] = b.Name
+	}
+	return out
+}
+
+// TestSubmissionTargetsCurrentOnly pins the no-flag baseline: without
+// --stack, only the current branch is processed. Pre-existing
+// behaviour the new code must preserve.
+func TestSubmissionTargetsCurrentOnly(t *testing.T) {
+	g := buildSubmitGraph(t, nil)
+	got := branchNames(submissionTargets(g, "feat-c", false))
+	if want := []string{"feat-c"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestSubmissionTargetsStackFromBottom pins the original `--stack`
+// semantic: from the bottom of an unsubmitted stack, descendants
+// follow naturally and the ancestor walk finds nothing to prepend.
+func TestSubmissionTargetsStackFromBottom(t *testing.T) {
+	g := buildSubmitGraph(t, nil)
+	got := branchNames(submissionTargets(g, "feat-a", true))
+	if want := []string{"feat-a", "feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestSubmissionTargetsStackFromMiddleIncludesAncestors pins B7: a
+// user running `sm submit --stack` from a non-bottom branch on a
+// fresh stack still pushes the unsubmitted parents above. The
+// resulting slice is trunk-toward-current order so the push loop
+// opens parent PRs before child PRs.
+func TestSubmissionTargetsStackFromMiddleIncludesAncestors(t *testing.T) {
+	g := buildSubmitGraph(t, nil)
+	got := branchNames(submissionTargets(g, "feat-c", true))
+	if want := []string{"feat-a", "feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestSubmissionTargetsStackFromTopIncludesAncestors pins the
+// concrete shape the user hit in this repo: ran `sm submit --stack`
+// from the leaf, only the leaf was pushed, PR creation failed
+// because the base branch hadn't reached origin yet. With B7,
+// every unsubmitted ancestor is now picked up automatically.
+func TestSubmissionTargetsStackFromTopIncludesAncestors(t *testing.T) {
+	g := buildSubmitGraph(t, nil)
+	got := branchNames(submissionTargets(g, "feat-d", true))
+	if want := []string{"feat-a", "feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestSubmissionTargetsStopsAtFirstSubmittedAncestor pins the
+// idempotency guard: the ancestor walk stops at the first parent
+// that already has a PR so a re-run never accidentally re-pushes
+// merged stacks below that point.
+func TestSubmissionTargetsStopsAtFirstSubmittedAncestor(t *testing.T) {
+	// feat-a has PR #2 (already submitted, maybe merged elsewhere);
+	// feat-b is unsubmitted; feat-c is current (also unsubmitted).
+	g := buildSubmitGraph(t, map[string]int{"feat-a": 2})
+	got := branchNames(submissionTargets(g, "feat-c", true))
+	// feat-a is excluded — it has a PR. feat-b is unsubmitted and
+	// directly above current, so it gets prepended. Then descendants.
+	if want := []string{"feat-b", "feat-c", "feat-d"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+// TestSubmissionTargetsImmediateParentSubmitted pins the boundary:
+// if the current branch's IMMEDIATE parent already has a PR, no
+// ancestors are prepended at all (we don't reach over a submitted
+// stack).
+func TestSubmissionTargetsImmediateParentSubmitted(t *testing.T) {
+	g := buildSubmitGraph(t, map[string]int{"feat-b": 3})
+	got := branchNames(submissionTargets(g, "feat-c", true))
+	if want := []string{"feat-c", "feat-d"}; !equalStrings(got, want) {
+		t.Fatalf("targets = %v, want %v", got, want)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
 
 // TestDerivePRMetaSingleCommit pins B6: a branch with exactly one
 // commit produces a PR whose title is the commit subject and whose

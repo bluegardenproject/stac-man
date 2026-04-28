@@ -76,13 +76,7 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		return r, fmt.Errorf("branch %q is not tracked; run `sm track` first", current)
 	}
 
-	var targets []stack.Branch
-	if opts.Stack {
-		targets = g.TopoOrderFrom(current)
-	} else {
-		b, _ := g.Get(current)
-		targets = []stack.Branch{b}
-	}
+	targets := submissionTargets(g, current, opts.Stack)
 
 	names := make([]string, 0, len(targets))
 	for _, t := range targets {
@@ -218,6 +212,55 @@ func (s *Service) persistPR(ctx context.Context, branch string, number int) {
 	}
 	meta.PR = number
 	_ = s.Store.SetBranch(ctx, branch, meta)
+}
+
+// submissionTargets resolves the branches Submit should process.
+//
+// When wholeStack is true the slice is current + every descendant,
+// with any unsubmitted ancestors PREPENDED so a user running
+// `sm submit --stack` from the middle (or top) of a fresh stack
+// still pushes the whole chain. The walk over ancestors stops at
+// the first ancestor that already has a PR — previously-submitted
+// or merged stacks below that point are deliberately untouched so
+// re-running submit is idempotent and never accidentally re-pushes
+// merged history.
+//
+// When wholeStack is false only the current branch is returned,
+// matching the no-flag default.
+func submissionTargets(g *stack.Graph, current string, wholeStack bool) []stack.Branch {
+	if !wholeStack {
+		b, ok := g.Get(current)
+		if !ok {
+			return nil
+		}
+		return []stack.Branch{b}
+	}
+
+	descendants := g.TopoOrderFrom(current)
+
+	// Ancestors() yields immediate-parent first, then walks up.
+	// Collect ancestors with no PR yet; stop at the first one that
+	// has been submitted before so we don't reach across stack
+	// boundaries into work that's already in review.
+	ancestors := g.Ancestors(current)
+	var unsubmitted []stack.Branch
+	for _, a := range ancestors {
+		if a.PR > 0 {
+			break
+		}
+		unsubmitted = append(unsubmitted, a)
+	}
+
+	// Reverse unsubmitted so callers see trunk-toward-current order,
+	// then concatenate descendants. The push loop later relies on
+	// parents-before-children ordering so each PR's base ref already
+	// exists on origin by the time we open the PR.
+	out := make([]stack.Branch, 0, len(unsubmitted)+len(descendants))
+	for i := len(unsubmitted) - 1; i >= 0; i-- {
+		out = append(out, unsubmitted[i])
+	}
+	out = append(out, descendants...)
+	return out
 }
 
 // buildPRTitle turns "feat/login-handler" into "feat: login handler".
