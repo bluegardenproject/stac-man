@@ -20,6 +20,13 @@ type SubmitOptions struct {
 	// Body is the body for any newly-created PR. Existing PRs keep
 	// their body.
 	Body string
+	// NoRestack tells Submit to push branches even when their
+	// recorded ParentSHA is stale relative to the parent's tip,
+	// instead of skipping them with a "needs restack" message. The
+	// caller is responsible for understanding that the resulting
+	// PR may have a noisy diff; we surface every stale branch in
+	// SubmitReport.StaleParentSHA so the warning is unmissable.
+	NoRestack bool
 }
 
 // SubmitReport summarizes what Submit did per branch.
@@ -30,6 +37,7 @@ type SubmitReport struct {
 	Updated            []SubmitPR
 	Skipped            []SubmitSkip
 	DivergedStackmates []DivergedBranch // tracked branches with stale origin not in target list
+	StaleParentSHA     []string         // pushed via --no-restack despite a stale ParentSHA
 }
 
 // DivergedBranch records a tracked branch whose local tip differs
@@ -97,16 +105,23 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 	client := gh.New("")
 
 	for _, b := range targets {
-		// Refuse to push branches whose ParentSHA is stale: pushing
-		// without a clean restack would create a garbled PR.
+		// Refuse to push branches whose ParentSHA is stale unless the
+		// user opted into --no-restack. classifyStaleParent contains
+		// the actual decision so the per-flag behavior is exercised
+		// by a focused unit test instead of a full Submit run.
 		if b.Parent != "" && b.Parent != trunk {
 			parentTip, err := s.G.RevParse(ctx, b.Parent)
 			if err == nil && parentTip != b.ParentSHA {
-				r.Skipped = append(r.Skipped, SubmitSkip{
-					Branch: b.Name,
-					Reason: "needs restack — run `sm restack` first",
-				})
-				continue
+				switch classifyStaleParent(opts.NoRestack) {
+				case staleSkip:
+					r.Skipped = append(r.Skipped, SubmitSkip{
+						Branch: b.Name,
+						Reason: "needs restack — run `sm restack` first",
+					})
+					continue
+				case staleWarn:
+					r.StaleParentSHA = append(r.StaleParentSHA, b.Name)
+				}
 			}
 		}
 
@@ -204,6 +219,14 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 	// without having to discover the gap by hitting it.
 	if !opts.Stack {
 		r.DivergedStackmates = s.divergedStackmates(ctx, g, current, targets)
+	}
+
+	// Submit can change CI state (push triggers a fresh run) and
+	// mergeability (retargeted base, new tip on origin). The cache
+	// would otherwise serve the pre-push status to the very next
+	// `sm log`, defeating the round-trip we just paid for.
+	if gitDir, err := s.G.GitDir(ctx); err == nil {
+		_ = gh.InvalidateChecksCache(gitDir)
 	}
 
 	return r, nil
@@ -339,4 +362,32 @@ func containsSkip(skips []SubmitSkip, branch string) bool {
 		}
 	}
 	return false
+}
+
+// staleParentAction is the outcome of the parent-SHA freshness check
+// for a single submit target. Exists as a typed value so the no-flag
+// vs --no-restack split has one obvious place in the codebase.
+type staleParentAction int
+
+const (
+	// staleSkip removes the branch from the push and PR-edit loop and
+	// records a "needs restack" entry in SubmitReport.Skipped. This is
+	// the historical default — users had to restack before submitting
+	// any branch with a stale parent.
+	staleSkip staleParentAction = iota
+	// staleWarn lets the push proceed but records the branch in
+	// SubmitReport.StaleParentSHA so the user has an unmissable signal
+	// that the resulting PR may show parent commits in its diff.
+	staleWarn
+)
+
+// classifyStaleParent returns the action Submit should take when a
+// target's recorded ParentSHA differs from the parent's tip.
+// noRestack is opts.NoRestack: setting it (the new --no-restack flag)
+// flips the default skip into a non-fatal warning + push.
+func classifyStaleParent(noRestack bool) staleParentAction {
+	if noRestack {
+		return staleWarn
+	}
+	return staleSkip
 }

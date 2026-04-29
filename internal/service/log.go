@@ -17,6 +17,14 @@ type LogOptions struct {
 	// branch to decorate nodes with PR state. Skipped if gh isn't
 	// available.
 	IncludePRStatus bool
+	// IncludeChecks adds a CI rollup dot next to each PR pill. Set
+	// to false from the cmd layer when --no-checks is passed; falls
+	// through silently if gh isn't available.
+	IncludeChecks bool
+	// IncludeMergeStatus adds the GitHub mergeability glyph next to
+	// each PR pill. False when --no-merge-status is passed. Drafts
+	// and closed PRs never render a glyph regardless of this flag.
+	IncludeMergeStatus bool
 }
 
 // Log returns a rendered string showing the stack tree from the trunk
@@ -42,6 +50,7 @@ func (s *Service) Log(ctx context.Context, opts LogOptions) (string, error) {
 	}
 
 	prMap := map[string]gh.PR{}
+	statusMap := map[string]gh.PRStatus{}
 	if opts.IncludePRStatus {
 		client := gh.New("")
 		// Best-effort: if gh isn't available the rest of log still works.
@@ -51,6 +60,10 @@ func (s *Service) Log(ctx context.Context, opts LogOptions) (string, error) {
 				prMap = prs
 			}
 		}
+		statusMap = s.fetchPRStatuses(ctx, prMap, statusFetchOptions{
+			wantChecks: opts.IncludeChecks,
+			wantMerge:  opts.IncludeMergeStatus,
+		})
 	}
 
 	var b strings.Builder
@@ -66,7 +79,7 @@ func (s *Service) Log(ctx context.Context, opts LogOptions) (string, error) {
 	roots := g.Roots()
 	for i, root := range roots {
 		isLast := i == len(roots)-1
-		s.renderNode(&b, g, root, "", isLast, current, prMap)
+		s.renderNode(&b, g, root, "", isLast, current, prMap, statusMap, opts)
 	}
 
 	if len(roots) == 0 {
@@ -86,6 +99,8 @@ func (s *Service) renderNode(
 	isLast bool,
 	current string,
 	prMap map[string]gh.PR,
+	statusMap map[string]gh.PRStatus,
+	opts LogOptions,
 ) {
 	connector := "├─ "
 	childPrefix := prefix + "│  "
@@ -114,11 +129,24 @@ func (s *Service) renderNode(
 		suffix = ui.Render(theme.Dimmed, fmt.Sprintf(" #%d", branch.PR))
 	}
 
+	if status, ok := statusMap[branch.Name]; ok {
+		if opts.IncludeChecks {
+			if dot := renderCheckDot(status.Checks); dot != "" {
+				suffix += " " + dot
+			}
+		}
+		if opts.IncludeMergeStatus && !status.IsDraft {
+			if glyph := renderMergeGlyph(status.Mergeable); glyph != "" {
+				suffix += " " + glyph
+			}
+		}
+	}
+
 	b.WriteString(connectorRendered + ui.Render(style, name) + suffix + "\n")
 
 	children := g.ChildrenOf(branch.Name)
 	for i, child := range children {
-		s.renderNode(b, g, child, childPrefix, i == len(children)-1, current, prMap)
+		s.renderNode(b, g, child, childPrefix, i == len(children)-1, current, prMap, statusMap, opts)
 	}
 }
 
@@ -133,6 +161,39 @@ func renderPRPill(pr gh.PR) string {
 		return ui.Render(theme.PRClosed, label+" closed")
 	default:
 		return ui.Render(theme.PROpen, label+" open")
+	}
+}
+
+// renderCheckDot returns a single coloured bullet representing the
+// CI rollup, or "" when there are no checks at all (a configured-
+// less repo would otherwise carry a permanent dim dot for every PR).
+func renderCheckDot(rollup gh.CheckRollup) string {
+	switch rollup {
+	case gh.ChecksPass:
+		return ui.Render(theme.CheckOK, "●")
+	case gh.ChecksPending:
+		return ui.Render(theme.CheckPending, "●")
+	case gh.ChecksFail:
+		return ui.Render(theme.CheckFail, "●")
+	default:
+		return ""
+	}
+}
+
+// renderMergeGlyph returns the per-row mergeability indicator. We
+// deliberately use ✓ / ⚠ / ? — distinct shapes from the CI dot — so
+// a quick glance at `sm log` separates "CI is green" from "GitHub
+// thinks this can merge".
+func renderMergeGlyph(m gh.Mergeability) string {
+	switch m {
+	case gh.MergeMergeable:
+		return ui.Render(theme.MergeOK, "✓")
+	case gh.MergeConflicting:
+		return ui.Render(theme.MergeConflict, "⚠")
+	case gh.MergeUnknown:
+		return ui.Render(theme.MergeUnknown, "?")
+	default:
+		return ""
 	}
 }
 
