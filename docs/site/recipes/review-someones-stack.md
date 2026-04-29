@@ -35,11 +35,15 @@ What this does, in order:
 ## Starting from PR #142, ending state
 
 ```
-* feat/web-form          #142 OPEN  (current — the one you want to review)
-  └─ feat/api-endpoints  #141 OPEN
-     └─ feat/db-schema   #140 MERGED
-        └─ main
+stac-man
+
+main
+└─ feat/db-schema  #140 merged
+   └─ feat/api-endpoints  #141 open  CI ready
+      └─ feat/web-form  ← current  #142 open  CI conflict
 ```
+
+`feat/web-form` is the PR you want to review (HEAD is on it). `CI conflict` flags it as `CONFLICTING` on GitHub — typical when an ancestor has merged but the local chain hasn't been rebased onto trunk yet. Run `sm sync` to clean that up before reading the diff.
 
 Now you can:
 

@@ -54,10 +54,12 @@ Output:
 After this, `feat/auth-everything` is replaced by the chain above. HEAD is on the topmost new branch (`feat/auth-docs`). `sm log` confirms:
 
 ```
-* feat/auth-docs
-  └─ feat/auth-handlers
-     └─ feat/auth-models
-        └─ main
+stac-man
+
+main
+└─ feat/auth-models
+   └─ feat/auth-handlers
+      └─ feat/auth-docs  ← current
 ```
 
 ## Step 3 — submit as a stack
