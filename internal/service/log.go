@@ -131,13 +131,13 @@ func (s *Service) renderNode(
 
 	if status, ok := statusMap[branch.Name]; ok {
 		if opts.IncludeChecks {
-			if dot := renderCheckDot(status.Checks); dot != "" {
-				suffix += " " + dot
+			if badge := renderCheckBadge(status.Checks); badge != "" {
+				suffix += " " + badge
 			}
 		}
 		if opts.IncludeMergeStatus && !status.IsDraft {
-			if glyph := renderMergeGlyph(status.Mergeable); glyph != "" {
-				suffix += " " + glyph
+			if badge := renderMergeBadge(status.Mergeable); badge != "" {
+				suffix += " " + badge
 			}
 		}
 	}
@@ -164,34 +164,35 @@ func renderPRPill(pr gh.PR) string {
 	}
 }
 
-// renderCheckDot returns a single coloured bullet representing the
-// CI rollup, or "" when there are no checks at all (a configured-
-// less repo would otherwise carry a permanent dim dot for every PR).
-func renderCheckDot(rollup gh.CheckRollup) string {
+// renderCheckBadge returns a coloured "CI" chip representing the CI
+// rollup, or "" when there are no checks at all (a config-less repo
+// would otherwise carry a permanent neutral badge per row). The
+// label is intentionally constant across states so the column aligns
+// — colour, not text, communicates pass / pending / fail.
+func renderCheckBadge(rollup gh.CheckRollup) string {
 	switch rollup {
 	case gh.ChecksPass:
-		return ui.Render(theme.CheckOK, "●")
+		return ui.Render(theme.BadgeCIPass, "CI")
 	case gh.ChecksPending:
-		return ui.Render(theme.CheckPending, "●")
+		return ui.Render(theme.BadgeCIPending, "CI")
 	case gh.ChecksFail:
-		return ui.Render(theme.CheckFail, "●")
+		return ui.Render(theme.BadgeCIFail, "CI")
 	default:
 		return ""
 	}
 }
 
-// renderMergeGlyph returns the per-row mergeability indicator. We
-// deliberately use ✓ / ⚠ / ? — distinct shapes from the CI dot — so
-// a quick glance at `sm log` separates "CI is green" from "GitHub
-// thinks this can merge".
-func renderMergeGlyph(m gh.Mergeability) string {
+// renderMergeBadge returns the per-row mergeability indicator as a
+// chip distinct from the CI badge: green "ready" when GitHub says
+// MERGEABLE, orange "conflict" when CONFLICTING. UNKNOWN suppresses
+// the badge so the column doesn't get noisy while GitHub is still
+// computing the merge state.
+func renderMergeBadge(m gh.Mergeability) string {
 	switch m {
 	case gh.MergeMergeable:
-		return ui.Render(theme.MergeOK, "✓")
+		return ui.Render(theme.BadgeMergeReady, "ready")
 	case gh.MergeConflicting:
-		return ui.Render(theme.MergeConflict, "⚠")
-	case gh.MergeUnknown:
-		return ui.Render(theme.MergeUnknown, "?")
+		return ui.Render(theme.BadgeMergeConflict, "conflict")
 	default:
 		return ""
 	}

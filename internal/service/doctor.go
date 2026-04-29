@@ -13,12 +13,12 @@ import (
 type DoctorReport struct {
 	Trunk          string
 	TrackedCount   int
-	NeedsRestack   []string         // branches whose ParentSHA is stale
-	StaleSHA       []string         // branches whose recorded parent commit doesn't exist
-	DriftedParent  []string         // recorded parent SHA exists but is not in the branch's history
-	UntrackedRoots []string         // local branches that look like stack roots but aren't tracked
-	MergeConflicts []MergeConflict  // PRs GitHub reports as CONFLICTING
-	Issues         []string         // graph-level errors (cycles, missing parents)
+	NeedsRestack   []string        // branches whose ParentSHA is stale
+	StaleSHA       []string        // branches whose recorded parent commit doesn't exist
+	DriftedParent  []string        // recorded parent SHA exists but is not in the branch's history
+	UntrackedRoots []string        // local branches that look like stack roots but aren't tracked
+	MergeConflicts []MergeConflict // PRs GitHub reports as CONFLICTING
+	Issues         []string        // graph-level errors (cycles, missing parents)
 }
 
 // MergeConflict identifies a tracked branch whose PR is reported as
