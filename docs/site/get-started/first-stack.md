@@ -42,9 +42,11 @@ sm modify -a -m "handlers: implement /login"
 `sm create` again branches off the current branch, so `feat/auth-handlers`'s parent is `feat/auth-models`. Now `sm log` shows the chain:
 
 ```
-* feat/auth-handlers   (current)
-  └─ feat/auth-models
-     └─ main
+stac-man
+
+main
+└─ feat/auth-models
+   └─ feat/auth-handlers  ← current
 ```
 
 ## 4. Submit as PRs
@@ -92,9 +94,13 @@ sm land
 Your tree now looks like:
 
 ```
-* feat/auth-handlers   (PR #2, base = main)
-  └─ main
+stac-man
+
+main
+└─ feat/auth-handlers  ← current  #2 open  CI ready
 ```
+
+The PR #2 stack table is also refreshed in place — it no longer mentions the merged `feat/auth-models` row.
 
 ## What to read next
 

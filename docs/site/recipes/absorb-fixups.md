@@ -45,11 +45,15 @@ If `git-absorb` is missing, `sm absorb` prints an install hint and exits. It's n
 Starting state:
 
 ```
+stac-man
+
 main
-└── feat/api-models
-└── feat/api-handlers
-└── feat/api-tests   (current, working-tree dirty with a fix)
+└─ feat/api-models
+   └─ feat/api-handlers
+      └─ feat/api-tests  ← current
 ```
+
+(Working tree on `feat/api-tests` is dirty with a fix that conceptually belongs in `feat/api-handlers`.)
 
 The dirty hunk lives in `internal/handlers/login.go` — code that was originally written in `feat/api-handlers`'s second commit. Run:
 
