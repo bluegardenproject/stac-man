@@ -50,6 +50,20 @@ var (
 	PRMerged = lipgloss.NewStyle().Foreground(White).Background(RolePRMerged).Padding(0, 1).Bold(true)
 	PRClosed = lipgloss.NewStyle().Foreground(Black).Background(RolePRClosed).Padding(0, 1)
 
+	// CI status dots — rendered as a single coloured glyph next to the
+	// PR pill in `sm log`. Kept distinct from the merge-status glyph
+	// (different shape) so the two pieces of information don't blur.
+	CheckOK      = lipgloss.NewStyle().Foreground(NeonLime).Bold(true)
+	CheckPending = lipgloss.NewStyle().Foreground(NeonYellow).Bold(true)
+	CheckFail    = lipgloss.NewStyle().Foreground(HotPink).Bold(true)
+
+	// Mergeability glyphs — appended after the CI dot when GitHub
+	// reports a definitive mergeable / conflicting state. Drafts and
+	// closed PRs intentionally produce no glyph.
+	MergeOK       = lipgloss.NewStyle().Foreground(NeonLime).Bold(true)
+	MergeConflict = lipgloss.NewStyle().Foreground(HotPink).Bold(true)
+	MergeUnknown  = lipgloss.NewStyle().Foreground(Dim)
+
 	// Toasts
 	SuccessToast = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

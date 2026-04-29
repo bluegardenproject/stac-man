@@ -267,6 +267,16 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 			_ = s.G.Checkout(ctx, originalBranch)
 		}
 	}
+
+	// Sync's restack cascade rewrites every descendant after a
+	// merge upstream — both CI state and mergeability go stale on
+	// GitHub the moment the next `sm submit` pushes, but the cache
+	// from before sync would still claim the old state. Drop it so
+	// `sm log` re-fetches on next render.
+	if gitDir, err := s.G.GitDir(ctx); err == nil {
+		_ = gh.InvalidateChecksCache(gitDir)
+	}
+
 	return r, nil
 }
 
