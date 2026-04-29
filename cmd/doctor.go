@@ -50,7 +50,7 @@ func renderDoctor(r service.DoctorReport) {
 			if mc.PR > 0 {
 				label = fmt.Sprintf("#%d %s", mc.PR, mc.Branch)
 			}
-			fmt.Println("  " + ui.Render(theme.MergeConflict, "⚠ "+label))
+			fmt.Printf("  %s %s\n", ui.Render(theme.BadgeMergeConflict, "conflict"), label)
 		}
 		fmt.Println(ui.Render(theme.Dimmed, "  → resolve on GitHub or rebase locally; `sm sync` after an upstream merge often fixes this."))
 	}
