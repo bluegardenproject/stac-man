@@ -48,11 +48,14 @@ untracked branches with unique commits:
 
 | Issue | Meaning | Suggested fix |
 |---|---|---|
+| `PRs with merge conflicts` | GitHub reports the PR as `CONFLICTING` — typically when an ancestor PR's base on origin is stale after a sync. | Resolve on GitHub, or `sm sync && sm restack && sm submit`. |
 | `needs restack` | Parent SHA differs from parent's current tip. | `sm restack` |
 | `stale parent SHA` | Recorded SHA is no longer reachable. | `sm restack` |
 | `drifted parent SHA` | Branch tip rewrote outside `sm`. | `sm restack` or fix manually |
 | `untracked branches with unique commits` | Branch you might want in the stack but haven't tracked. | `sm checkout <name> && sm track` |
 | `graph issues` | Cycles, missing parents, etc. — should not happen in steady state. | File a bug |
+
+The `PRs with merge conflicts` check issues a best-effort `gh pr view` per tracked branch with a recorded PR number, sharing the 60s cache `sm log` already populates at `.git/stac-man/checks-cache.json`. Drafts and merged or closed PRs are skipped — only PRs the user is actively preparing to land are surfaced. If `gh` is unavailable or unauthenticated, doctor silently omits the block instead of failing; doctor must always work offline.
 
 ## When to run it
 
