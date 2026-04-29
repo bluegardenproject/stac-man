@@ -27,6 +27,11 @@ type SubmitOptions struct {
 	// PR may have a noisy diff; we surface every stale branch in
 	// SubmitReport.StaleParentSHA so the warning is unmissable.
 	NoRestack bool
+	// NoStackTable disables the auto-generated "Stack" block that
+	// Submit otherwise injects (or refreshes) at the top of every
+	// PR body, fenced by the stac-man sentinels. Useful when the
+	// user wants the PR description to stay strictly hand-edited.
+	NoStackTable bool
 }
 
 // SubmitReport summarizes what Submit did per branch.
@@ -221,6 +226,14 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		r.DivergedStackmates = s.divergedStackmates(ctx, g, current, targets)
 	}
 
+	// Stack-table pass runs AFTER every PR exists, because each PR's
+	// body needs to reference siblings whose numbers were unknown
+	// when their own create/update call ran. Skips silently when
+	// the user opted out via --no-stack-table.
+	if !opts.NoStackTable {
+		s.applyStackTables(ctx, client, g, targets, &r)
+	}
+
 	// Submit can change CI state (push triggers a fresh run) and
 	// mergeability (retargeted base, new tip on origin). The cache
 	// would otherwise serve the pre-push status to the very next
@@ -230,6 +243,72 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 	}
 
 	return r, nil
+}
+
+// applyStackTables walks every target with a known PR number and
+// rewrites its PR body so the stac-man-fenced "Stack" block reflects
+// the current chain. Idempotent: a branch whose body already carries
+// the same block is left alone (no needless `gh pr edit` round-trip),
+// and re-runs of `sm submit` simply replace the block in-place.
+//
+// Each target costs one `gh pr view` (for the latest body) plus an
+// optional `gh pr edit` when the body actually changes. Errors are
+// best-effort — a flaky gh round-trip shouldn't fail the whole
+// submit when the PRs themselves were created/updated successfully.
+func (s *Service) applyStackTables(ctx context.Context, client *gh.Client, g *stack.Graph, targets []stack.Branch, r *SubmitReport) {
+	prByBranch := buildPRMap(g, *r)
+	if len(prByBranch) == 0 {
+		return
+	}
+	for _, t := range targets {
+		if containsSkip(r.Skipped, t.Name) {
+			continue
+		}
+		num, ok := prByBranch[t.Name]
+		if !ok || num == 0 {
+			continue
+		}
+		chain := stackChainForBranch(g, t.Name)
+		table := renderStackTable(chain, t.Name, prByBranch)
+		if table == "" {
+			continue
+		}
+		// Re-fetch so a manual edit between the create/update call
+		// above and this pass is preserved outside the sentinels.
+		existing, ok, err := client.PRForBranch(ctx, t.Name)
+		if err != nil || !ok {
+			continue
+		}
+		newBody := injectStackTable(existing.Body, table)
+		if newBody == existing.Body {
+			continue
+		}
+		_ = client.EditPR(ctx, num, gh.EditPROptions{Body: newBody})
+	}
+}
+
+// buildPRMap merges the persisted PR numbers from the stack graph
+// with the freshly-allocated numbers from this submit run. Created
+// PRs land first, followed by Updated, so a re-run that recreates a
+// branch (rare but possible) overrides the stale stored number.
+func buildPRMap(g *stack.Graph, r SubmitReport) map[string]int {
+	out := map[string]int{}
+	for _, b := range g.Branches() {
+		if b.PR > 0 {
+			out[b.Name] = b.PR
+		}
+	}
+	for _, p := range r.Updated {
+		if p.Number > 0 {
+			out[p.Branch] = p.Number
+		}
+	}
+	for _, p := range r.Created {
+		if p.Number > 0 {
+			out[p.Branch] = p.Number
+		}
+	}
+	return out
 }
 
 // divergedStackmates returns tracked branches whose local tip
