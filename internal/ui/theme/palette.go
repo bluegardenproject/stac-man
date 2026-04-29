@@ -80,7 +80,7 @@ var (
 	RoleNeedsRestack  = HotPink     // branch whose parent has moved
 	RoleConflict      = NeonOrange  // interrupted-restack state
 	RoleHealthy       = NeonLime    // clean / merged-ready
-	RolePROpen        = NeonLime    // PR is open and not draft
+	RolePROpen        = NeonPink    // PR is open and not draft (decorative — the literal "open" word carries the state; colour is brand, not status)
 	RolePRDraft       = NeonYellow  // PR is draft
 	RolePRMerged      = NeonPurple  // PR is merged
 	RolePRClosed      = Dim         // PR is closed without merging
