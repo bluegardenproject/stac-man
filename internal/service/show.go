@@ -31,13 +31,21 @@ type BranchView struct {
 	Commits      []CommitView `json:"commits,omitempty"`
 }
 
-// PRView is the subset of PR fields stac-man surfaces in `sm show`.
+// PRView is the subset of PR fields stac-man surfaces in `sm show`
+// and `sm log --json`. The two commands share this type so a single
+// JSON parser handles both. Checks and Mergeable are populated by
+// `sm log` when the gh round-trip provides them; `sm show` leaves
+// them at their zero values (CheckRollup="" and Mergeability="").
+// Both fields are omitempty so consumers can distinguish "not
+// computed" from any of the meaningful states.
 type PRView struct {
-	Number int    `json:"number"`
-	State  string `json:"state"`
-	URL    string `json:"url"`
-	Draft  bool   `json:"draft"`
-	Title  string `json:"title,omitempty"`
+	Number    int             `json:"number"`
+	State     string          `json:"state"`
+	URL       string          `json:"url"`
+	Draft     bool            `json:"draft"`
+	Title     string          `json:"title,omitempty"`
+	Checks    gh.CheckRollup  `json:"checks,omitempty"`
+	Mergeable gh.Mergeability `json:"mergeable,omitempty"`
 }
 
 // CommitView is one commit unique to the branch (vs parent).

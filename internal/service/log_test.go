@@ -259,6 +259,173 @@ func TestRenderLogTreeEmptyGraphHint(t *testing.T) {
 	}
 }
 
+// TestLogResultFromDataShape pins the public LogResult contract for
+// the same fixture graph as the renderer test: trunk on the top
+// level, no trunk row in Branches, depth-first pre-order over
+// name-sorted roots, parent + children populated, IsCurrent set on
+// the right row.
+func TestLogResultFromDataShape(t *testing.T) {
+	d := &logData{
+		Trunk:   "main",
+		Current: "feat-b",
+		Roots: []*logBranchNode{
+			{
+				Branch: stack.Branch{Name: "feat-a", Parent: "main", ParentSHA: "sha-main", PR: 10},
+				PR:     &gh.PR{Number: 10, State: gh.PRStateOpen, URL: "https://example/10", Title: "feat-a"},
+				Status: &gh.PRStatus{Number: 10, Checks: gh.ChecksPass, Mergeable: gh.MergeMergeable},
+				Children: []*logBranchNode{
+					{
+						Branch:       stack.Branch{Name: "feat-b", Parent: "feat-a", ParentSHA: "sha-a", PR: 11},
+						NeedsRestack: true,
+						PR:           &gh.PR{Number: 11, State: gh.PRStateOpen, IsDraft: true},
+					},
+				},
+			},
+			{
+				Branch: stack.Branch{Name: "feat-c", Parent: "main"},
+			},
+		},
+	}
+	r := logResultFromData(d)
+	if r.Trunk != "main" || r.Current != "feat-b" {
+		t.Fatalf("trunk/current = %q/%q, want main/feat-b", r.Trunk, r.Current)
+	}
+	gotOrder := make([]string, 0, len(r.Branches))
+	for _, b := range r.Branches {
+		gotOrder = append(gotOrder, b.Branch)
+	}
+	wantOrder := []string{"feat-a", "feat-b", "feat-c"}
+	for i, want := range wantOrder {
+		if gotOrder[i] != want {
+			t.Fatalf("branches order = %v, want %v", gotOrder, wantOrder)
+		}
+	}
+
+	a, b, c := r.Branches[0], r.Branches[1], r.Branches[2]
+	if a.Depth != 1 || b.Depth != 2 || c.Depth != 1 {
+		t.Fatalf("depths = %d/%d/%d, want 1/2/1", a.Depth, b.Depth, c.Depth)
+	}
+	if !b.IsCurrent {
+		t.Fatalf("feat-b should be IsCurrent")
+	}
+	if a.IsCurrent || c.IsCurrent {
+		t.Fatalf("only feat-b should be IsCurrent (a=%v c=%v)", a.IsCurrent, c.IsCurrent)
+	}
+	if !b.NeedsRestack {
+		t.Fatalf("feat-b NeedsRestack should be true")
+	}
+	if len(a.Children) != 1 || a.Children[0] != "feat-b" {
+		t.Fatalf("feat-a children = %v, want [feat-b]", a.Children)
+	}
+	if a.PR == nil || a.PR.Number != 10 || a.PR.State != "OPEN" || a.PR.Checks != gh.ChecksPass || a.PR.Mergeable != gh.MergeMergeable {
+		t.Fatalf("feat-a PR mapping wrong: %+v", a.PR)
+	}
+	if b.PR == nil || !b.PR.Draft {
+		t.Fatalf("feat-b PR draft flag missing: %+v", b.PR)
+	}
+	if c.PR != nil {
+		t.Fatalf("feat-c has no PR; PRView should be nil, got %+v", c.PR)
+	}
+}
+
+// TestLogResultFromDataRecordedPRWithoutLiveData covers the case
+// where the branch carries a recorded PR number but the gh fetch was
+// skipped (--no-pr) so n.PR is nil. The mapping surfaces the number
+// alone so consumers still see the link.
+func TestLogResultFromDataRecordedPRWithoutLiveData(t *testing.T) {
+	d := &logData{
+		Trunk: "main",
+		Roots: []*logBranchNode{
+			{Branch: stack.Branch{Name: "feat-x", Parent: "main", PR: 42}},
+		},
+	}
+	r := logResultFromData(d)
+	if len(r.Branches) != 1 || r.Branches[0].PR == nil || r.Branches[0].PR.Number != 42 || r.Branches[0].PR.State != "" {
+		t.Fatalf("recorded-PR-only mapping wrong: %+v", r.Branches[0].PR)
+	}
+}
+
+// TestFormatLogPorcelainSchema pins the column count, ordering, and
+// the dash-for-empty convention. Porcelain consumers parse by
+// position; any drift here is a breaking change.
+func TestFormatLogPorcelainSchema(t *testing.T) {
+	r := &LogResult{
+		Trunk: "main",
+		Branches: []*LogBranch{
+			{
+				Branch: "feat-a", Parent: "main", Depth: 1,
+				PR: &PRView{Number: 10, State: "OPEN", Checks: gh.ChecksPass, Mergeable: gh.MergeMergeable},
+			},
+			{
+				Branch: "feat-b", Parent: "feat-a", Depth: 2,
+				IsCurrent: true, NeedsRestack: true,
+				PR: &PRView{Number: 11, State: "OPEN", Draft: true, Checks: gh.ChecksFail, Mergeable: gh.MergeConflicting},
+			},
+			{Branch: "feat-c", Parent: "main", Depth: 1},
+		},
+	}
+	out := FormatLogPorcelain(r)
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("rows = %d, want 3\n%s", len(lines), out)
+	}
+	if len(LogPorcelainColumns) != 9 {
+		t.Fatalf("LogPorcelainColumns drift: got %d cols, want 9", len(LogPorcelainColumns))
+	}
+	for i, line := range lines {
+		fields := strings.Split(line, "\t")
+		if len(fields) != len(LogPorcelainColumns) {
+			t.Fatalf("row %d field count = %d, want %d (line=%q)", i, len(fields), len(LogPorcelainColumns), line)
+		}
+	}
+	wantA := "feat-a\tmain\t1\t10\topen\tpass\tmergeable\tfalse\tfalse"
+	if lines[0] != wantA {
+		t.Fatalf("row 0:\n got  %q\n want %q", lines[0], wantA)
+	}
+	wantB := "feat-b\tfeat-a\t2\t11\tdraft\tfail\tconflicting\ttrue\ttrue"
+	if lines[1] != wantB {
+		t.Fatalf("row 1:\n got  %q\n want %q", lines[1], wantB)
+	}
+	wantC := "feat-c\tmain\t1\t-\t-\t-\t-\tfalse\tfalse"
+	if lines[2] != wantC {
+		t.Fatalf("row 2:\n got  %q\n want %q", lines[2], wantC)
+	}
+}
+
+// TestFormatLogPorcelainEmpty guards the freshly-cloned-repo case:
+// no rows in, no rows out. (sm log's tree renderer prints an
+// onboarding hint there; porcelain stays silent because emitting a
+// hint would corrupt the schema for scripts.)
+func TestFormatLogPorcelainEmpty(t *testing.T) {
+	out := FormatLogPorcelain(&LogResult{Trunk: "main", Branches: []*LogBranch{}})
+	if out != "" {
+		t.Fatalf("empty-graph porcelain = %q, want \"\"", out)
+	}
+}
+
+// TestPorcelainPRStateVocab pins the open / draft / merged / closed
+// vocabulary so it stays in lock-step with the rendered tree pills
+// (shared user mental model).
+func TestPorcelainPRStateVocab(t *testing.T) {
+	cases := []struct {
+		pr   *PRView
+		want string
+	}{
+		{nil, "-"},
+		{&PRView{Number: 0}, "-"},
+		{&PRView{Number: 1, State: "OPEN"}, "open"},
+		{&PRView{Number: 1, State: "MERGED"}, "merged"},
+		{&PRView{Number: 1, State: "CLOSED"}, "closed"},
+		{&PRView{Number: 1, State: "OPEN", Draft: true}, "draft"},
+		{&PRView{Number: 1, State: "OPEN", Draft: true /* draft beats merged */}, "draft"},
+	}
+	for i, tc := range cases {
+		if got := porcelainPRState(tc.pr); got != tc.want {
+			t.Fatalf("case %d: porcelainPRState(%+v) = %q, want %q", i, tc.pr, got, tc.want)
+		}
+	}
+}
+
 func containsString(xs []string, s string) bool {
 	for _, x := range xs {
 		if x == s {

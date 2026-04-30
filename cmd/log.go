@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/philipptpunkt/stac-man/internal/service"
@@ -12,6 +13,8 @@ func init() {
 		noPRStatus    bool
 		noChecks      bool
 		noMergeStatus bool
+		jsonOut       bool
+		porcelainOut  bool
 	)
 	cmd := &cobra.Command{
 		Use:     "log",
@@ -22,14 +25,38 @@ func init() {
 			"GitHub mergeability badge (green ready / orange conflict). Pass --no-pr to skip " +
 			"the gh PR lookup, --no-checks to drop the CI badge, or --no-merge-status to " +
 			"drop the mergeability badge. Statuses are cached for 60s under " +
-			".git/stac-man/checks-cache.json.",
+			".git/stac-man/checks-cache.json.\n\n" +
+			"For scripts and AI agents, --json emits the same graph as a single JSON " +
+			"document (per-branch shape matches `sm show --json`) and --porcelain emits a " +
+			"stable tab-separated row per branch with no header.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			out, err := newService().Log(c.Context(), service.LogOptions{
+			if jsonOut && porcelainOut {
+				return fmt.Errorf("--json and --porcelain are mutually exclusive")
+			}
+			opts := service.LogOptions{
 				IncludePRStatus:    !noPRStatus,
 				IncludeChecks:      !noPRStatus && !noChecks,
 				IncludeMergeStatus: !noPRStatus && !noMergeStatus,
-			})
+			}
+			svc := newService()
+			if jsonOut || porcelainOut {
+				result, err := svc.LogData(c.Context(), opts)
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					encoded, err := json.MarshalIndent(result, "", "  ")
+					if err != nil {
+						return err
+					}
+					fmt.Println(string(encoded))
+					return nil
+				}
+				fmt.Print(service.FormatLogPorcelain(result))
+				return nil
+			}
+			out, err := svc.Log(c.Context(), opts)
 			if err != nil {
 				return err
 			}
@@ -40,6 +67,8 @@ func init() {
 	cmd.Flags().BoolVar(&noPRStatus, "no-pr", false, "skip PR status lookup (no gh calls)")
 	cmd.Flags().BoolVar(&noChecks, "no-checks", false, "skip the CI rollup badge per row")
 	cmd.Flags().BoolVar(&noMergeStatus, "no-merge-status", false, "skip the GitHub mergeability badge per row")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the stack as JSON (per-branch shape matches `sm show --json`)")
+	cmd.Flags().BoolVar(&porcelainOut, "porcelain", false, "emit one tab-separated row per branch with no header")
 
 	register(cmd)
 }

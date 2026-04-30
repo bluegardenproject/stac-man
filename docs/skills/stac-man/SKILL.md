@@ -50,7 +50,7 @@ sm submit --stack
 |---|---|
 | `sm create <name>` | Creates a new branch off HEAD; records the previous branch as its parent. With `-m` and `-a` it commits in one step. |
 | `sm modify [-c] [-a] [-m msg]` | Default: amends the current commit. With `-c` creates a new commit. With `-a` stages all changes first. **Always restacks descendants automatically.** |
-| `sm log` (alias: `ls`) | Renders the stack tree from trunk down, with current-branch / needs-restack / PR markers plus per-row CI and mergeability badges (cached for 60s). `--no-pr` / `--no-checks` / `--no-merge-status` opt out of each column. |
+| `sm log` (alias: `ls`) | Renders the stack tree from trunk down, with current-branch / needs-restack / PR markers plus per-row CI and mergeability badges (cached for 60s). `--no-pr` / `--no-checks` / `--no-merge-status` opt out of each column. `--json` emits the same graph as one document (per-branch shape matches `sm show --json`); `--porcelain` emits stable tab-separated rows. |
 | `sm checkout [name]` (alias: `co`) | Switch HEAD to a tracked branch. Without arg, lists choices. |
 | `sm up` / `sm down` / `sm top` / `sm bottom` | Walk the stack relative to current. `--first` resolves forks alphabetically. |
 | `sm restack [branch]` | Rebases the chain rooted at branch onto current parent tips. Pauses on conflict. |
@@ -81,7 +81,7 @@ sm submit --stack
 - **User has uncommitted fixups for prior commits in the stack:** prefer `sm absorb` over manually `git commit --fixup` + `git rebase --autosquash`; absorb does both and cascades the restack.
 - **Pulling someone else's stack to review:** prefer `sm get <PR>` over multiple `gh pr checkout` invocations — it sets the parent metadata so `sm log` mirrors the author's tree.
 - **User wants to undo what `sm` just did:** prefer `sm undo` over manual `git reset` + git config edits. Refuses while a rebase is paused — finish or abort first.
-- **Reading branch state programmatically:** prefer `sm show --json` over scraping `sm log`.
+- **Reading branch state programmatically:** for one branch, use `sm show --json`. For the whole stack, use `sm log --json` (or `sm log --porcelain` from shell pipelines). Both share the same per-branch `pr` shape so a single parser handles either.
 
 ## Conflict handling
 
