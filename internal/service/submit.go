@@ -8,6 +8,7 @@ import (
 
 	"github.com/philipptpunkt/stac-man/internal/gh"
 	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 )
 
 // SubmitOptions configures Submit.
@@ -32,6 +33,12 @@ type SubmitOptions struct {
 	// PR body, fenced by the stac-man sentinels. Useful when the
 	// user wants the PR description to stay strictly hand-edited.
 	NoStackTable bool
+	// Progress receives one Start / Done pair per long-running step
+	// (push, gh PR create/update, stack-table refresh) so the cmd
+	// layer can render a spinner or live status lines while Submit
+	// blocks on network I/O. Nil-safe: callers that don't want
+	// progress output should pass progress.Discard().
+	Progress progress.Reporter
 }
 
 // SubmitReport summarizes what Submit did per branch.
@@ -72,6 +79,12 @@ type SubmitSkip struct {
 // retargets it.
 func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport, error) {
 	r := SubmitReport{}
+	// Normalise the progress sink once so the rest of the function
+	// can call methods without a nil-check at every step.
+	if opts.Progress == nil {
+		opts.Progress = progress.Discard()
+	}
+	prog := opts.Progress
 	if err := s.EnsureRepo(ctx); err != nil {
 		return r, err
 	}
@@ -140,13 +153,17 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		// no-op on; the very next `git push --force-with-lease`
 		// would catch the divergence anyway.
 		if inSync, err := s.G.RemoteMatchesLocal(ctx, b.Name); err == nil && inSync {
+			prog.Skip(fmt.Sprintf("%s already in sync with origin", b.Name))
 			r.SkippedPushes = append(r.SkippedPushes, b.Name)
 		} else {
+			prog.Start(fmt.Sprintf("pushing %s", b.Name))
 			// Force-with-lease because a previous restack will have
 			// rewritten history; plain push would be rejected.
 			if err := s.G.Push(ctx, b.Name, true); err != nil {
+				prog.Fail(fmt.Sprintf("pushing %s", b.Name))
 				return r, fmt.Errorf("pushing %s: %w", b.Name, err)
 			}
+			prog.Done(fmt.Sprintf("pushed %s", b.Name))
 			r.Pushed = append(r.Pushed, b.Name)
 		}
 	}
@@ -163,8 +180,13 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 
 		derivedTitle, derivedBody := s.derivePRMeta(ctx, b.Name, base)
 
+		// One progress step covers PRForBranch + the create / edit
+		// round-trip so the user sees a single "submitting PR for
+		// X" line per branch instead of two flickers.
+		prog.Start(fmt.Sprintf("submitting PR for %s", b.Name))
 		existing, ok, err := client.PRForBranch(ctx, b.Name)
 		if err != nil {
+			prog.Fail(fmt.Sprintf("submitting PR for %s", b.Name))
 			return r, err
 		}
 		if ok {
@@ -184,8 +206,12 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			}
 			if edits.Title != "" || edits.Body != "" || edits.Base != "" {
 				if err := client.EditPR(ctx, existing.Number, edits); err != nil {
+					prog.Fail(fmt.Sprintf("submitting PR for %s", b.Name))
 					return r, fmt.Errorf("editing #%d: %w", existing.Number, err)
 				}
+				prog.Done(fmt.Sprintf("updated PR #%d for %s", existing.Number, b.Name))
+			} else {
+				prog.Done(fmt.Sprintf("PR #%d for %s already up to date", existing.Number, b.Name))
 			}
 			r.Updated = append(r.Updated, SubmitPR{Branch: b.Name, Number: existing.Number, URL: existing.URL})
 			s.persistPR(ctx, b.Name, existing.Number)
@@ -208,8 +234,10 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			Draft: opts.Draft,
 		})
 		if err != nil {
+			prog.Fail(fmt.Sprintf("creating PR for %s", b.Name))
 			return r, fmt.Errorf("creating PR for %s: %w", b.Name, err)
 		}
+		prog.Done(fmt.Sprintf("created PR #%d for %s", num, b.Name))
 		r.Created = append(r.Created, SubmitPR{Branch: b.Name, Number: num})
 		s.persistPR(ctx, b.Name, num)
 	}
@@ -231,7 +259,7 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 	// when their own create/update call ran. Skips silently when
 	// the user opted out via --no-stack-table.
 	if !opts.NoStackTable {
-		s.applyStackTables(ctx, client, g, targets, &r)
+		s.applyStackTables(ctx, client, g, targets, &r, prog)
 	}
 
 	// Submit can change CI state (push triggers a fresh run) and
@@ -255,7 +283,7 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 // optional `gh pr edit` when the body actually changes. Errors are
 // best-effort — a flaky gh round-trip shouldn't fail the whole
 // submit when the PRs themselves were created/updated successfully.
-func (s *Service) applyStackTables(ctx context.Context, client *gh.Client, g *stack.Graph, targets []stack.Branch, r *SubmitReport) {
+func (s *Service) applyStackTables(ctx context.Context, client *gh.Client, g *stack.Graph, targets []stack.Branch, r *SubmitReport, prog progress.Reporter) {
 	prByBranch := buildPRMap(g, *r)
 	if len(prByBranch) == 0 {
 		return
@@ -283,7 +311,15 @@ func (s *Service) applyStackTables(ctx context.Context, client *gh.Client, g *st
 		if newBody == existing.Body {
 			continue
 		}
-		_ = client.EditPR(ctx, num, gh.EditPROptions{Body: newBody})
+		// Only announce stack-table refreshes that actually issue
+		// an edit — silent no-ops would clutter the spinner output
+		// with one line per PR even when nothing changed.
+		prog.Start(fmt.Sprintf("refreshing stack table on PR #%d", num))
+		if err := client.EditPR(ctx, num, gh.EditPROptions{Body: newBody}); err != nil {
+			prog.Fail(fmt.Sprintf("refreshing stack table on PR #%d", num))
+			continue
+		}
+		prog.Done(fmt.Sprintf("refreshed stack table on PR #%d", num))
 	}
 }
 

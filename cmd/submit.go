@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/philipptpunkt/stac-man/internal/service"
 	"github.com/philipptpunkt/stac-man/internal/ui"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 	"github.com/philipptpunkt/stac-man/internal/ui/theme"
 	"github.com/spf13/cobra"
 )
@@ -36,6 +38,7 @@ func init() {
 				Body:         body,
 				NoRestack:    noRestack,
 				NoStackTable: noStackTable,
+				Progress:     progress.New(os.Stdout),
 			})
 			renderSubmitReport(r)
 			return err

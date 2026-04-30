@@ -8,6 +8,7 @@ import (
 	"github.com/philipptpunkt/stac-man/internal/gh"
 	"github.com/philipptpunkt/stac-man/internal/stack"
 	"github.com/philipptpunkt/stac-man/internal/ui"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 	"github.com/philipptpunkt/stac-man/internal/ui/theme"
 )
 
@@ -25,6 +26,12 @@ type LogOptions struct {
 	// each PR pill. False when --no-merge-status is passed. Drafts
 	// and closed PRs never render a glyph regardless of this flag.
 	IncludeMergeStatus bool
+	// Progress receives one step per gh round-trip the log makes
+	// (PR list, then per-PR status fetch for cache misses). Nil
+	// collapses to a discard reporter — the cmd layer wires up a
+	// real spinner for interactive `sm log` and Discard for the
+	// `--json` / `--porcelain` output paths.
+	Progress progress.Reporter
 }
 
 // logData is the structured intermediate Log builds before rendering.
@@ -286,6 +293,11 @@ func (s *Service) buildLogData(ctx context.Context, opts LogOptions) (*logData, 
 		current = ""
 	}
 
+	prog := opts.Progress
+	if prog == nil {
+		prog = progress.Discard()
+	}
+
 	prMap := map[string]gh.PR{}
 	statusMap := map[string]gh.PRStatus{}
 	if opts.IncludePRStatus {
@@ -293,13 +305,19 @@ func (s *Service) buildLogData(ctx context.Context, opts LogOptions) (*logData, 
 		// Best-effort: if gh isn't available the rest of log still works.
 		if err := gh.PreflightCheck(ctx); err == nil {
 			tracked, _ := s.Store.ListTrackedBranches(ctx)
-			if prs, err := client.PRsForBranches(ctx, tracked); err == nil {
+			prog.Start("fetching PR list")
+			prs, err := client.PRsForBranches(ctx, tracked)
+			if err != nil {
+				prog.Fail("fetching PR list")
+			} else {
+				prog.Done("fetched PR list")
 				prMap = prs
 			}
 		}
 		statusMap = s.fetchPRStatuses(ctx, prMap, statusFetchOptions{
 			wantChecks: opts.IncludeChecks,
 			wantMerge:  opts.IncludeMergeStatus,
+			progress:   prog,
 		})
 	}
 
