@@ -54,6 +54,37 @@ type logBranchNode struct {
 	Children     []*logBranchNode
 }
 
+// LogResult is the structured form of `sm log`. JSON tags drive
+// `sm log --json`. The trunk is reported once at the top level and
+// is intentionally NOT repeated as a branch row — every entry in
+// Branches is a tracked (non-trunk) branch. Order is depth-first
+// pre-order over each root in name-sorted order, so a parent always
+// appears before its descendants and the same input graph always
+// produces the same output.
+type LogResult struct {
+	Trunk    string       `json:"trunk"`
+	Current  string       `json:"current,omitempty"`
+	Branches []*LogBranch `json:"branches"`
+}
+
+// LogBranch is one tracked-branch row in a LogResult. Field names
+// overlap with BranchView (from `sm show --json`) so a JSON consumer
+// can write a single per-branch parser; the embedded *PRView is the
+// same type both commands use, including its optional Checks /
+// Mergeable fields. Children carries only the immediate child names
+// — the full subtree is reconstructible from the flat Branches list
+// via Parent links, so we don't duplicate the recursive shape here.
+type LogBranch struct {
+	Branch       string   `json:"branch"`
+	Parent       string   `json:"parent,omitempty"`
+	ParentSHA    string   `json:"parentSHA,omitempty"`
+	Depth        int      `json:"depth"`
+	IsCurrent    bool     `json:"isCurrent,omitempty"`
+	NeedsRestack bool     `json:"needsRestack,omitempty"`
+	Children     []string `json:"children,omitempty"`
+	PR           *PRView  `json:"pr,omitempty"`
+}
+
 // Log returns a rendered string showing the stack tree from the trunk
 // downward. Caller writes it to stdout.
 func (s *Service) Log(ctx context.Context, opts LogOptions) (string, error) {
@@ -62,6 +93,172 @@ func (s *Service) Log(ctx context.Context, opts LogOptions) (string, error) {
 		return "", err
 	}
 	return renderLogTree(d, opts), nil
+}
+
+// LogData returns the structured graph `sm log` builds, ready for
+// machine consumption. It runs the same gather phase as Log but
+// skips the rendered-tree formatter — callers get back a
+// fully-populated *LogResult they can JSON-encode, format as
+// porcelain rows, or transform further. Used by `sm log --json` and
+// `sm log --porcelain`.
+func (s *Service) LogData(ctx context.Context, opts LogOptions) (*LogResult, error) {
+	d, err := s.buildLogData(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return logResultFromData(d), nil
+}
+
+// logResultFromData maps the unexported logData (used by the rendered
+// tree) onto the public LogResult shape. Pure mapping function so
+// unit tests can exercise it without a Service.
+func logResultFromData(d *logData) *LogResult {
+	out := &LogResult{
+		Trunk:    d.Trunk,
+		Current:  d.Current,
+		Branches: []*LogBranch{},
+	}
+	for _, root := range d.Roots {
+		appendLogBranch(&out.Branches, root, 1, d.Current)
+	}
+	return out
+}
+
+func appendLogBranch(out *[]*LogBranch, n *logBranchNode, depth int, current string) {
+	lb := &LogBranch{
+		Branch:       n.Branch.Name,
+		Parent:       n.Branch.Parent,
+		ParentSHA:    n.Branch.ParentSHA,
+		Depth:        depth,
+		IsCurrent:    n.Branch.Name == current,
+		NeedsRestack: n.NeedsRestack,
+	}
+	for _, c := range n.Children {
+		lb.Children = append(lb.Children, c.Branch.Name)
+	}
+	switch {
+	case n.PR != nil:
+		lb.PR = &PRView{
+			Number: n.PR.Number,
+			State:  string(n.PR.State),
+			URL:    n.PR.URL,
+			Draft:  n.PR.IsDraft,
+			Title:  n.PR.Title,
+		}
+		if n.Status != nil {
+			lb.PR.Checks = n.Status.Checks
+			lb.PR.Mergeable = n.Status.Mergeable
+		}
+	case n.Branch.PR > 0:
+		// Recorded PR number but no fresh data (e.g. --no-pr was
+		// passed). Surface the number alone so consumers still see
+		// the link to the GitHub PR.
+		lb.PR = &PRView{Number: n.Branch.PR}
+	}
+	*out = append(*out, lb)
+	for _, c := range n.Children {
+		appendLogBranch(out, c, depth+1, current)
+	}
+}
+
+// LogPorcelainColumns is the canonical column order for
+// `sm log --porcelain`. Stable across releases — adding a column
+// means appending; existing scripts must keep working unchanged.
+var LogPorcelainColumns = []string{
+	"branch", "parent", "depth", "pr_number", "pr_state", "ci", "mergeable", "is_current", "needs_restack",
+}
+
+// FormatLogPorcelain renders a LogResult as the documented tab-
+// separated porcelain format: one row per tracked branch, fields in
+// LogPorcelainColumns order, empty fields written as "-". No header
+// line — the column order is the contract.
+func FormatLogPorcelain(r *LogResult) string {
+	var b strings.Builder
+	for _, lb := range r.Branches {
+		fields := []string{
+			lb.Branch,
+			dashIfEmpty(lb.Parent),
+			fmt.Sprintf("%d", lb.Depth),
+			"-", "-", "-", "-",
+			boolWord(lb.IsCurrent),
+			boolWord(lb.NeedsRestack),
+		}
+		if lb.PR != nil {
+			if lb.PR.Number > 0 {
+				fields[3] = fmt.Sprintf("%d", lb.PR.Number)
+			}
+			fields[4] = porcelainPRState(lb.PR)
+			fields[5] = porcelainCI(lb.PR.Checks)
+			fields[6] = porcelainMerge(lb.PR.Mergeable)
+		}
+		b.WriteString(strings.Join(fields, "\t"))
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// porcelainPRState collapses the PRView state + Draft flag into a
+// single token. Matches the labels used in the rendered tree (open /
+// draft / merged / closed) so users see consistent vocabulary
+// whether they're reading the synthwave tree or grepping porcelain
+// output.
+func porcelainPRState(pr *PRView) string {
+	if pr == nil || pr.Number == 0 {
+		return "-"
+	}
+	if pr.Draft {
+		return "draft"
+	}
+	switch pr.State {
+	case "MERGED":
+		return "merged"
+	case "CLOSED":
+		return "closed"
+	case "OPEN":
+		return "open"
+	case "":
+		return "-"
+	default:
+		return strings.ToLower(pr.State)
+	}
+}
+
+func porcelainCI(c gh.CheckRollup) string {
+	switch c {
+	case gh.ChecksPass:
+		return "pass"
+	case gh.ChecksPending:
+		return "pending"
+	case gh.ChecksFail:
+		return "fail"
+	default:
+		return "-"
+	}
+}
+
+func porcelainMerge(m gh.Mergeability) string {
+	switch m {
+	case gh.MergeMergeable:
+		return "mergeable"
+	case gh.MergeConflicting:
+		return "conflicting"
+	default:
+		return "-"
+	}
+}
+
+func dashIfEmpty(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func boolWord(v bool) string {
+	if v {
+		return "true"
+	}
+	return "false"
 }
 
 // buildLogData runs every side-effectful step Log needs (repo + trunk
