@@ -9,7 +9,17 @@ import (
 	"github.com/philipptpunkt/stac-man/internal/gh"
 	"github.com/philipptpunkt/stac-man/internal/restack"
 	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 )
+
+// SyncOptions configures Sync.
+type SyncOptions struct {
+	// Progress receives one step per long-running phase (fetch,
+	// pull, gh PR-state lookup, per-PR retargets, per-root restack).
+	// Nil collapses to a discard reporter so non-cmd callers (e.g.
+	// `sm land`) keep their current quiet behaviour.
+	Progress progress.Reporter
+}
 
 // SyncReport summarizes what happened during a sync. The caller (cmd
 // layer) decides how to render it.
@@ -140,8 +150,12 @@ func sortMergedByDepth(g *stack.Graph, names []string, trunk string) []string {
 // Sync fetches trunk, fast-forwards the local trunk, deletes branches
 // whose commits are fully merged, re-parents their children, and
 // restacks every survivor.
-func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
+func (s *Service) Sync(ctx context.Context, opts SyncOptions) (SyncReport, error) {
 	r := SyncReport{}
+	prog := opts.Progress
+	if prog == nil {
+		prog = progress.Discard()
+	}
 	if err := s.EnsureRepo(ctx); err != nil {
 		return r, err
 	}
@@ -164,18 +178,24 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 	tracked, _ := s.Store.ListTrackedBranches(ctx)
 	s.recordHistory(ctx, "sync", "", append([]string{trunk}, tracked...))
 
+	prog.Start("fetching from origin")
 	if err := s.G.FetchAll(ctx); err != nil {
+		prog.Fail("fetching from origin")
 		return r, fmt.Errorf("fetching: %w", err)
 	}
+	prog.Done("fetched from origin")
 
 	// Fast-forward the local trunk via a temporary checkout. We need
 	// to be on the trunk for `git pull --ff-only` to update it.
 	if err := s.G.Checkout(ctx, trunk); err != nil {
 		return r, fmt.Errorf("checking out %s: %w", trunk, err)
 	}
+	prog.Start(fmt.Sprintf("pulling %s", trunk))
 	if err := s.G.Pull(ctx, trunk); err != nil {
+		prog.Fail(fmt.Sprintf("pulling %s", trunk))
 		return r, fmt.Errorf("pulling %s: %w", trunk, err)
 	}
+	prog.Done(fmt.Sprintf("pulled %s", trunk))
 
 	g, err := stack.Load(ctx, s.Store)
 	if err != nil {
@@ -208,9 +228,13 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 		// Best-effort: a single failed gh round-trip shouldn't take
 		// down the whole sync. We just lose squash-merge detection
 		// for this run and fall back to history-only.
+		prog.Start("checking PR merge state on GitHub")
 		prsByBranch, ghErr := s.fetchTrackedPRs(ctx, g, ghClient, excluded)
 		if ghErr == nil {
+			prog.Done("checked PR merge state on GitHub")
 			mergedByPR = mergedByPRState(g, prsByBranch, excluded)
+		} else {
+			prog.Fail("checking PR merge state on GitHub")
 		}
 	}
 
@@ -232,7 +256,9 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 	// Phase 2: tell GitHub about the new parent edges. EditPR
 	// failures are recorded per-entry but never abort the run —
 	// flaky network is not a reason to undo the local cleanup
-	// we just finished.
+	// we just finished. Each retarget gets its own progress step
+	// so the spinner in interactive shells (or the plain ✓ / ✗
+	// line in pipes) shows the user which PR is being touched.
 	if len(retargetEntries) > 0 && ghClient == nil {
 		// We arrive here only when the merged set has child PRs
 		// but no other tracked branch had a PR record before —
@@ -242,8 +268,13 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 	}
 	for _, e := range retargetEntries {
 		rp := RetargetedPR{Branch: e.Branch, PR: e.PR, NewBase: e.NewBase}
+		label := fmt.Sprintf("retargeting PR #%d → %s", e.PR, e.NewBase)
+		prog.Start(label)
 		if err := ghClient.EditPR(ctx, e.PR, gh.EditPROptions{Base: e.NewBase}); err != nil {
 			rp.Err = err.Error()
+			prog.Fail(label)
+		} else {
+			prog.Done(fmt.Sprintf("retargeted PR #%d → %s", e.PR, e.NewBase))
 		}
 		r.RetargetedPRs = append(r.RetargetedPRs, rp)
 	}
@@ -260,10 +291,16 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 	// descendants pick up trunk's new tip without us touching their
 	// metadata here.
 	for _, root := range g.Roots() {
+		// Restack steps run last so a paused-conflict ends with the
+		// matching ✗ line — the user reads back from the bottom of
+		// scrollback to see which root the conflict landed on.
+		prog.Start(fmt.Sprintf("restacking %s", root.Name))
 		if err := restack.New(s.G, s.Store).Restack(ctx, root.Name); err != nil {
+			prog.Fail(fmt.Sprintf("restacking %s", root.Name))
 			r.RestackedBranch = root.Name
 			return r, err
 		}
+		prog.Done(fmt.Sprintf("restacked %s", root.Name))
 	}
 
 	// Best-effort: hop back to the original branch if it still exists.

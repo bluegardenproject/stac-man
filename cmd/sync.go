@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/philipptpunkt/stac-man/internal/service"
 	"github.com/philipptpunkt/stac-man/internal/ui"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 	"github.com/philipptpunkt/stac-man/internal/ui/theme"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +20,9 @@ func init() {
 			"merged branch's parent, and restacks every surviving root.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			report, err := newService().Sync(c.Context())
+			report, err := newService().Sync(c.Context(), service.SyncOptions{
+				Progress: progress.New(os.Stdout),
+			})
 			renderSyncReport(report)
 			return printRestackOutcome(err)
 		},
