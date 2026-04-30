@@ -31,10 +31,13 @@ func init() {
 }
 
 func renderSyncReport(r service.SyncReport) {
-	fmt.Printf("%s pulled %s\n",
-		ui.Render(theme.OK, "✓"),
-		ui.Render(theme.Accent, r.Trunk),
-	)
+	// Trunk fetch + pull is now reported via the progress reporter
+	// (one ✓-line per phase), so the static "pulled <trunk>" line
+	// here would just duplicate it. Worse, the old version printed
+	// unconditionally even when the pull never ran (e.g. dirty
+	// tree errored out before the fetch). The summary now sticks
+	// to information that's exclusive to the report — merged
+	// branches and retargeted PRs.
 	if len(r.MergedBranches) > 0 {
 		fmt.Println(ui.Render(theme.Header, "merged & deleted:"))
 		for _, b := range r.MergedBranches {
