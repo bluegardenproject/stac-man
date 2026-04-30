@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/philipptpunkt/stac-man/internal/gh"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 )
 
 // statusFetchOptions controls which subset of PRStatus the caller
@@ -15,6 +17,10 @@ import (
 type statusFetchOptions struct {
 	wantChecks bool
 	wantMerge  bool
+	// progress is optional; nil collapses to a discard reporter so
+	// `sm doctor` (which doesn't surface progress today) inherits a
+	// silent default while `sm log` can pass a real spinner.
+	progress progress.Reporter
 }
 
 // fetchPRStatuses returns one gh.PRStatus per branch in prMap, using
@@ -40,6 +46,11 @@ func (s *Service) fetchPRStatuses(ctx context.Context, prMap map[string]gh.PR, o
 		return out
 	}
 
+	prog := opts.progress
+	if prog == nil {
+		prog = progress.Discard()
+	}
+
 	gitDir, _ := s.G.GitDir(ctx)
 	cache := gh.LoadChecksCache(gitDir)
 	client := gh.New("")
@@ -55,13 +66,19 @@ func (s *Service) fetchPRStatuses(ctx context.Context, prMap map[string]gh.PR, o
 			continue
 		}
 		if cached, ok := cache.Get(pr.Number); ok {
+			// Cached hits don't get a progress line — they return in
+			// microseconds and the user shouldn't see any animation
+			// for free reads.
 			out[branch] = cached
 			continue
 		}
+		prog.Start(fmt.Sprintf("fetching status for PR #%d", pr.Number))
 		status, err := client.PRStatusForNumber(ctx, pr.Number)
 		if err != nil {
+			prog.Fail(fmt.Sprintf("fetching status for PR #%d", pr.Number))
 			continue
 		}
+		prog.Done(fmt.Sprintf("fetched status for PR #%d", pr.Number))
 		cache.Put(pr.Number, status)
 		dirty = true
 		out[branch] = status

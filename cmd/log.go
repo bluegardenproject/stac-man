@@ -3,8 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/philipptpunkt/stac-man/internal/service"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +43,9 @@ func init() {
 			}
 			svc := newService()
 			if jsonOut || porcelainOut {
+				// Machine-readable output: any spinner / status line
+				// would corrupt the stream consumers parse.
+				opts.Progress = progress.Discard()
 				result, err := svc.LogData(c.Context(), opts)
 				if err != nil {
 					return err
@@ -56,6 +61,7 @@ func init() {
 				fmt.Print(service.FormatLogPorcelain(result))
 				return nil
 			}
+			opts.Progress = progress.New(os.Stdout)
 			out, err := svc.Log(c.Context(), opts)
 			if err != nil {
 				return err
