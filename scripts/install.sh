@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-REPO="philipptpunkt/stac-man"
+REPO="bluegardenproject/stac-man"
 INSTALL_DIR="$HOME/.stac-man"
 BINARY_NAME="sm"
 

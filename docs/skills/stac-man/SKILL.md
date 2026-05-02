@@ -20,7 +20,7 @@ sm --version       # confirms sm is installed
 gh auth status     # confirms gh is authenticated (only needed for sm submit)
 ```
 
-If `sm` isn't installed: tell the user to install it from `github.com/philipptpunkt/stac-man` (binary) and re-run.
+If `sm` isn't installed: tell the user to install it from `github.com/bluegardenproject/stac-man` (binary) and re-run.
 
 `sm` auto-detects the trunk on first invocation (origin/HEAD → main → master) and persists it to `git config --local stac-man.trunk`. No setup step is required.
 

@@ -81,7 +81,7 @@ The rest of the docs assume `sm` because that's what everything looks like in he
 
 ## Will there be a TUI?
 
-[Yes — planned for v2.1.](https://github.com/philipptpunkt/stac-man/blob/main/ROADMAP.md) `sm` (no args) will open a Bubble Tea menu over the current stack with single-letter shortcuts for every action. Today the picker is only used by `sm checkout` (no args).
+[Yes — planned for v2.1.](https://github.com/bluegardenproject/stac-man/blob/main/ROADMAP.md) `sm` (no args) will open a Bubble Tea menu over the current stack with single-letter shortcuts for every action. Today the picker is only used by `sm checkout` (no args).
 
 ## Will there be a web UI?
 
@@ -93,7 +93,7 @@ License is currently TBD. We'll pin it before the v2.0 cut. (Issue tracker refle
 
 ## How do I report a bug?
 
-[github.com/philipptpunkt/stac-man/issues](https://github.com/philipptpunkt/stac-man/issues). Please include the output of:
+[github.com/bluegardenproject/stac-man/issues](https://github.com/bluegardenproject/stac-man/issues). Please include the output of:
 
 ```bash
 sm version

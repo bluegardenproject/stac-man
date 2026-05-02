@@ -133,7 +133,7 @@ git config --local --remove-section "branch.<name>"
 
 ## Still stuck
 
-Open an issue on [github.com/philipptpunkt/stac-man](https://github.com/philipptpunkt/stac-man/issues) with the output of:
+Open an issue on [github.com/bluegardenproject/stac-man](https://github.com/bluegardenproject/stac-man/issues) with the output of:
 
 ```bash
 sm version
