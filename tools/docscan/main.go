@@ -16,7 +16,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/philipptpunkt/stac-man/cmd"
+	"github.com/bluegardenproject/stac-man/cmd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

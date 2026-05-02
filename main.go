@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/philipptpunkt/stac-man/cmd"
+	"github.com/bluegardenproject/stac-man/cmd"
 )
 
 // Version is the binary version, set at build time via:

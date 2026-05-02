@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/philipptpunkt/stac-man/internal/service"
+	"github.com/bluegardenproject/stac-man/internal/service"
 	"github.com/spf13/cobra"
 )
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/history"
+	"github.com/bluegardenproject/stac-man/internal/history"
 )
 
 func TestBranchMetaFromSnapPreservesFields(t *testing.T) {

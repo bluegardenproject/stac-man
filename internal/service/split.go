@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/stack"
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // SplitMapping is one new branch carved out of the original.

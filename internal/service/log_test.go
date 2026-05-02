@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/gh"
-	"github.com/philipptpunkt/stac-man/internal/stack"
-	"github.com/philipptpunkt/stac-man/internal/store"
-	"github.com/philipptpunkt/stac-man/internal/store/memory"
+	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store/memory"
 )
 
 // TestRenderCheckBadgeHidesNone pins the "no checks configured" rule:

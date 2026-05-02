@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/restack"
-	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/restack"
+	"github.com/bluegardenproject/stac-man/internal/stack"
 )
 
 // AbsorbOptions configures Absorb.

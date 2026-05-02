@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/gh"
-	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/stack"
 )
 
 // LandOptions configures Land.

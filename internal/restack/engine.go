@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/stack"
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // Git is the slice of *git.Client the engine relies on. Defining it

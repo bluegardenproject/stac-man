@@ -5,11 +5,11 @@ import (
 	"io"
 	"strings"
 
+	"github.com/bluegardenproject/stac-man/internal/service"
+	"github.com/bluegardenproject/stac-man/internal/ui"
+	"github.com/bluegardenproject/stac-man/internal/ui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/philipptpunkt/stac-man/internal/service"
-	"github.com/philipptpunkt/stac-man/internal/ui"
-	"github.com/philipptpunkt/stac-man/internal/ui/theme"
 )
 
 // PickerResult is what [PickBranch] returns once the user acts on the
