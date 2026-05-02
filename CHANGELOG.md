@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.2.0](https://github.com/bluegardenproject/stac-man/compare/v0.1.0...v0.2.0) (2026-05-02)
+
+
+### Features
+
+* inject auto-managed stack table into PR bodies ([784e0e7](https://github.com/bluegardenproject/stac-man/commit/784e0e76d58822d2aae427f1b8ea2dfb526f0b9d))
+* **log:** add --json and --porcelain output formats ([ccf7262](https://github.com/bluegardenproject/stac-man/commit/ccf7262a3a260084f25c949020af7dbf7a2371fd))
+* **progress:** show spinner during sm sync ([60509b5](https://github.com/bluegardenproject/stac-man/commit/60509b552a9a15152608ee582f06f295ddcfa153))
+* **progress:** show spinner while pushing and fetching gh data ([5333494](https://github.com/bluegardenproject/stac-man/commit/53334948c4734d5d2b0f02add2db3ffdf9ebb96d))
+* show CI + mergeability in sm log/doctor and add submit --no-restack ([ae55d16](https://github.com/bluegardenproject/stac-man/commit/ae55d163fc9bee5804419b525744b552407f3b9f))
+
+
+### Bug Fixes
+
+* **sync:** stop resurrecting deleted children during merged cleanup ([ab6d1ef](https://github.com/bluegardenproject/stac-man/commit/ab6d1ef3e747f67ce55ddaea6637467316ec2dab))
+
+
+### Code Refactoring
+
+* **log:** extract logData / renderLogTree seam from Log ([6058c01](https://github.com/bluegardenproject/stac-man/commit/6058c01e4ee10dc4434054ed880a14b672ade19e))
+* switch CI/mergeability glyphs to coloured badges ([b266c78](https://github.com/bluegardenproject/stac-man/commit/b266c78144b969270a62364fe2cd76613fc5ee35))
+* switch open PR pill from green to pink ([e44ac14](https://github.com/bluegardenproject/stac-man/commit/e44ac14db7fdda26cbac86c6713e526d8b240bc4))
+* **sync:** drop static "pulled trunk" line from summary ([0a3493a](https://github.com/bluegardenproject/stac-man/commit/0a3493ab34c606fddc184dc36c7e1519c21080c6))
+
+
+### Documentation
+
+* document CI/mergeability badges, --no-restack, and PR body stack table ([9ac9da1](https://github.com/bluegardenproject/stac-man/commit/9ac9da10b98b490e349aa76314bcb1e19207c033))
+* refresh sm log snippets in recipes and first-stack tutorial ([94dfbf6](https://github.com/bluegardenproject/stac-man/commit/94dfbf6c5f6fddeb73ad9401bceec160e3208990))
+
+
+### Miscellaneous
+
+* **cursor:** add caveman mode rule and skill ([3796624](https://github.com/bluegardenproject/stac-man/commit/3796624a77ec9c88167aaa95f868a82fec5b145f))
+
 ## [0.1.0](https://github.com/bluegardenproject/stac-man/compare/v0.0.1...v0.1.0) (2026-04-28)
 
 
