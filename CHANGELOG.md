@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/bluegardenproject/stac-man/compare/v0.2.0...v0.2.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* point repo URLs at bluegardenproject/stac-man ([36ad8d6](https://github.com/bluegardenproject/stac-man/commit/36ad8d6483e4ec12b9759ba865989e15748958ca))
+* rename Go module to github.com/bluegardenproject/stac-man ([dbd2c1a](https://github.com/bluegardenproject/stac-man/commit/dbd2c1ab7286caf273045e6c2c72fe72bffe2de2))
+
+
+### Miscellaneous
+
+* **main:** release 0.1.0 ([e47fec9](https://github.com/bluegardenproject/stac-man/commit/e47fec9c35c383fd28ebbb4b4ebe8cc040f82e57))
+* **main:** release 0.2.0 ([3d9e736](https://github.com/bluegardenproject/stac-man/commit/3d9e736f0635b08f16602cdef7e813e31fb5585b))
+
 ## [0.2.0](https://github.com/bluegardenproject/stac-man/compare/v0.1.0...v0.2.0) (2026-05-02)
 
 
