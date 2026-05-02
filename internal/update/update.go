@@ -28,13 +28,13 @@ import (
 // Repo is the GitHub repo to query for releases. Exposed as a var so
 // tests can point at a stub server, but production code does not change
 // it.
-var Repo = "philipptpunkt/stac-man"
+var Repo = "bluegardenproject/stac-man"
 
 // InstallScriptURL is the bash one-liner target for Unix self-install.
-const InstallScriptURL = "https://raw.githubusercontent.com/philipptpunkt/stac-man/main/scripts/install.sh"
+const InstallScriptURL = "https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/install.sh"
 
 // InstallScriptURLPS1 is the powershell self-install target.
-const InstallScriptURLPS1 = "https://raw.githubusercontent.com/philipptpunkt/stac-man/main/scripts/install.ps1"
+const InstallScriptURLPS1 = "https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/install.ps1"
 
 // Release is the slice of the GitHub releases API payload we care
 // about. Anything else is intentionally dropped on the floor.

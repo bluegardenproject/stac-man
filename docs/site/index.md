@@ -14,7 +14,7 @@ hero:
       link: /concepts/
     - theme: alt
       text: View on GitHub
-      link: https://github.com/philipptpunkt/stac-man
+      link: https://github.com/bluegardenproject/stac-man
 
 features:
   - title: Local-first metadata

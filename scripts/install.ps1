@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$REPO = "philipptpunkt/stac-man"
+$REPO = "bluegardenproject/stac-man"
 $BINARY_NAME = "sm.exe"
 $ASSET_NAME = "sm-windows-amd64.exe"
 

@@ -146,11 +146,11 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/philipptpunkt/stac-man' },
+      { icon: 'github', link: 'https://github.com/bluegardenproject/stac-man' },
     ],
 
     editLink: {
-      pattern: 'https://github.com/philipptpunkt/stac-man/edit/main/docs/site/:path',
+      pattern: 'https://github.com/bluegardenproject/stac-man/edit/main/docs/site/:path',
       text: 'Edit this page on GitHub',
     },
 

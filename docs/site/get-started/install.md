@@ -5,13 +5,13 @@
 ## One-liner — Linux & macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/philipptpunkt/stac-man/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/install.sh | bash
 ```
 
 ## One-liner — Windows (PowerShell)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/philipptpunkt/stac-man/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/install.ps1 | iex
 ```
 
 The installer downloads the latest release binary into `~/.stac-man/sm` (or `%USERPROFILE%\.stac-man\sm.exe` on Windows) and adds that directory to your shell's `PATH`. You may need to restart your shell or `source` your shell rc file the first time.
@@ -50,7 +50,7 @@ sm update --check   # only report whether a newer release exists
 For contributors or platforms without a published binary (Go 1.25+):
 
 ```bash
-git clone https://github.com/philipptpunkt/stac-man.git
+git clone https://github.com/bluegardenproject/stac-man.git
 cd stac-man
 make build         # → ./sm with embedded version + build time
 ```
