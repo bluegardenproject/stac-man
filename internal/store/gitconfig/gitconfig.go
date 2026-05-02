@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // Schema version. Bump only when the on-disk layout changes; we read

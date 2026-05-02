@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/store"
-	"github.com/philipptpunkt/stac-man/internal/store/memory"
+	"github.com/bluegardenproject/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store/memory"
 )
 
 // buildGraph constructs an in-memory graph with the given trunk and

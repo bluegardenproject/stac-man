@@ -3,8 +3,8 @@ package ui
 import (
 	"os"
 
+	"github.com/bluegardenproject/stac-man/internal/ui/theme"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/philipptpunkt/stac-man/internal/ui/theme"
 )
 
 // ColorEnabled reports whether stac-man should emit ANSI color. Honors

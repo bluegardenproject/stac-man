@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/gh"
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // GetReport summarizes the result of fetching a remote stack locally.

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/philipptpunkt/stac-man/internal/config"
-	"github.com/philipptpunkt/stac-man/internal/ui"
-	"github.com/philipptpunkt/stac-man/internal/ui/theme"
+	"github.com/bluegardenproject/stac-man/internal/config"
+	"github.com/bluegardenproject/stac-man/internal/ui"
+	"github.com/bluegardenproject/stac-man/internal/ui/theme"
 	"github.com/spf13/cobra"
 )
 

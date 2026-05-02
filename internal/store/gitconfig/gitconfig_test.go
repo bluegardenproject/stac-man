@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // fakeConfig is an in-memory configClient backed by a map. It mimics

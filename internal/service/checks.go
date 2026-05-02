@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/gh"
-	"github.com/philipptpunkt/stac-man/internal/ui/progress"
+	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/ui/progress"
 )
 
 // statusFetchOptions controls which subset of PRStatus the caller

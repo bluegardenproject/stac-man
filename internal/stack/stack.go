@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // Branch is a single node in the stack graph.

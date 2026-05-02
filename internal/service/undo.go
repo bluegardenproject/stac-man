@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/history"
-	"github.com/philipptpunkt/stac-man/internal/restack"
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/history"
+	"github.com/bluegardenproject/stac-man/internal/restack"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // snapshot captures the current state of `branch` for a future undo.

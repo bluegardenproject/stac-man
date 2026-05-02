@@ -1,4 +1,4 @@
-module github.com/philipptpunkt/stac-man
+module github.com/bluegardenproject/stac-man
 
 go 1.25.0
 

@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/philipptpunkt/stac-man/internal/ui"
-	"github.com/philipptpunkt/stac-man/internal/ui/theme"
+	"github.com/bluegardenproject/stac-man/internal/ui"
+	"github.com/bluegardenproject/stac-man/internal/ui/theme"
 )
 
 // Reporter receives one Start per long-running step and exactly one
