@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/stack"
 )
 
 // Checkout switches HEAD to the named branch. If branch is empty,

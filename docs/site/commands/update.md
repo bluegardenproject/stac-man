@@ -34,7 +34,7 @@ sm update
 
 ## What it does
 
-1. Calls the GitHub releases API for `philipptpunkt/stac-man` to find the latest tag.
+1. Calls the GitHub releases API for `bluegardenproject/stac-man` to find the latest tag.
 2. Compares against the embedded `Version` of the running binary.
 3. If newer, runs the platform-appropriate install script (curl on Linux/macOS, iwr on Windows). Otherwise prints "You're already on the latest version."
 

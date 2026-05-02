@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/store"
-	"github.com/philipptpunkt/stac-man/internal/store/memory"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store/memory"
 )
 
 // TestDoctorReportsDriftedParent reproduces the second bug found

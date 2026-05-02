@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/stack"
-	"github.com/philipptpunkt/stac-man/internal/store"
-	"github.com/philipptpunkt/stac-man/internal/store/memory"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store/memory"
 )
 
 // buildSubmitGraph builds a stack with this shape so the B7 tests

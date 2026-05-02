@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/gh"
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/stack"
 )
 
 // BranchView is the rich, render-agnostic snapshot returned by Show.

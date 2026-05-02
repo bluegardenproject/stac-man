@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // CreateOptions configures Create.

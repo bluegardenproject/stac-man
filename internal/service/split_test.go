@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/git"
 )
 
 func makeCommits(shas ...string) []git.Commit {

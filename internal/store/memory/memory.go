@@ -6,7 +6,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/philipptpunkt/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store"
 )
 
 // Store is an in-memory implementation of store.Store.

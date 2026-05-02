@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/philipptpunkt/stac-man/internal/gh"
-	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/stack"
 )
 
 // DoctorReport summarizes the health of stac-man's metadata vs. the

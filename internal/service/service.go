@@ -11,9 +11,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/philipptpunkt/stac-man/internal/git"
-	"github.com/philipptpunkt/stac-man/internal/store"
-	"github.com/philipptpunkt/stac-man/internal/store/gitconfig"
+	"github.com/bluegardenproject/stac-man/internal/git"
+	"github.com/bluegardenproject/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store/gitconfig"
 )
 
 // Service wires the lower layers together. It is safe to construct

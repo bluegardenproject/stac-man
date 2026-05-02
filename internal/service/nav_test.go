@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/philipptpunkt/stac-man/internal/stack"
-	"github.com/philipptpunkt/stac-man/internal/store"
-	"github.com/philipptpunkt/stac-man/internal/store/memory"
+	"github.com/bluegardenproject/stac-man/internal/stack"
+	"github.com/bluegardenproject/stac-man/internal/store"
+	"github.com/bluegardenproject/stac-man/internal/store/memory"
 )
 
 // buildTestGraph wires up a memory-backed graph for navigation tests.

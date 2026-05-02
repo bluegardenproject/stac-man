@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/philipptpunkt/stac-man/internal/service"
-	"github.com/philipptpunkt/stac-man/internal/ui"
-	"github.com/philipptpunkt/stac-man/internal/ui/theme"
+	"github.com/bluegardenproject/stac-man/internal/service"
+	"github.com/bluegardenproject/stac-man/internal/ui"
+	"github.com/bluegardenproject/stac-man/internal/ui/theme"
 	"github.com/spf13/cobra"
 )
 
