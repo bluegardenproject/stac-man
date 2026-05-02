@@ -61,7 +61,7 @@ make build            # → ./sm
 make test             # go test ./...
 ```
 
-Commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/). The `commit-msg` hook in [`.githooks/`](.githooks/) enforces this locally; CI does the same.
+Commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) and Go files must pass `gofmt`. Both rules are enforced locally by the hooks in [`.githooks/`](.githooks/) (wired up by `make setup`) and re-checked in CI.
 
 Releases are driven by [Release Please](https://github.com/googleapis/release-please) on `main`. See the [release-please workflow](.github/workflows/release-please.yml) for the cross-compile matrix.
 
