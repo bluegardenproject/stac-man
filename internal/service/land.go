@@ -107,8 +107,11 @@ func (s *Service) Land(ctx context.Context, opts LandOptions) (LandReport, error
 	}
 
 	// Sync handles fetching trunk, deleting the merged branch locally,
-	// reparenting its children, and restacking the survivors.
-	sync, err := s.Sync(ctx)
+	// reparenting its children, and restacking the survivors. Land
+	// passes no progress sink so the post-merge sync stays as quiet
+	// as it was before the spinner work landed; the cmd layer
+	// renders its own concise summary at the end.
+	sync, err := s.Sync(ctx, SyncOptions{})
 	if err != nil {
 		return r, fmt.Errorf("merged but post-merge sync failed: %w", err)
 	}

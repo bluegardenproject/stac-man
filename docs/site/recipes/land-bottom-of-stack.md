@@ -5,13 +5,15 @@ The bottom-most PR has approvals and green CI. You want to land it AND keep work
 ## Starting state
 
 ```
+stac-man
+
 main
-└── feat/auth-models       (PR #41, OPEN, approved, green)
-    └── feat/auth-handlers (PR #42, OPEN)
-        └── feat/auth-docs (PR #43, DRAFT)
+└─ feat/auth-models  #41 open  CI ready
+   └─ feat/auth-handlers  #42 open  CI ready
+      └─ feat/auth-docs  ← current  #43 draft  CI
 ```
 
-You're sitting on `feat/auth-docs`.
+You're sitting on `feat/auth-docs`. PR #41 is approved and green; the `CI` chip is green and the `ready` chip says GitHub considers it mergeable.
 
 ## Step 1 — confirm the bottom is ready
 
@@ -19,7 +21,7 @@ You're sitting on `feat/auth-docs`.
 sm log
 ```
 
-If a PR is `DRAFT` or has red CI, decide whether you really want to land it before the next steps. `sm land` will refuse a red PR unless you pass `--force`.
+The CI badge on the bottom-most row tells you everything you need to know: green `CI` plus green `ready` means `sm land` will proceed without `--force`. If you see a red `CI`, an orange `conflict`, or a `draft` pill on the bottom-most PR, decide whether you really want to land it before continuing — `sm land` refuses red CI unless you pass `--force`, and a `conflict` chip means the PR will be rejected by GitHub regardless of stac-man's gates.
 
 ## Step 2 — land
 
@@ -43,12 +45,14 @@ What happens, in order:
 ## Ending state
 
 ```
+stac-man
+
 main
-└── feat/auth-handlers (PR #42, base = main)
-    └── feat/auth-docs (PR #43)
+└─ feat/auth-handlers  #42 open  CI ready
+   └─ feat/auth-docs  ← current  #43 draft  CI
 ```
 
-`feat/auth-models` is gone locally. PR #41 is merged. PR #42's base now points at `main` so reviewers see only the handler diff.
+`feat/auth-models` is gone locally. PR #41 is merged. PR #42's base now points at `main` so reviewers see only the handler diff. The `sm submit` that runs as part of `sm land`'s sync also refreshes the [stack table](/commands/submit#pr-body-stack-table) on every remaining PR's body so the chain reads one shorter.
 
 ## Variations
 

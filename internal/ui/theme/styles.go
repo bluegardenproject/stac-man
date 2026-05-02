@@ -50,6 +50,21 @@ var (
 	PRMerged = lipgloss.NewStyle().Foreground(White).Background(RolePRMerged).Padding(0, 1).Bold(true)
 	PRClosed = lipgloss.NewStyle().Foreground(Black).Background(RolePRClosed).Padding(0, 1)
 
+	// CI status badges — rendered as a coloured chip next to the PR
+	// pill in `sm log`. The label stays "CI" across all three states
+	// so the column lines up; only the background colour shifts.
+	// ChecksNone produces no badge so a config-less repo doesn't carry
+	// a permanent grey chip per row.
+	BadgeCIPass    = lipgloss.NewStyle().Foreground(Black).Background(NeonLime).Padding(0, 1).Bold(true)
+	BadgeCIPending = lipgloss.NewStyle().Foreground(Black).Background(NeonYellow).Padding(0, 1).Bold(true)
+	BadgeCIFail    = lipgloss.NewStyle().Foreground(White).Background(HotPink).Padding(0, 1).Bold(true)
+
+	// Mergeability badges — appended after the CI badge when GitHub
+	// reports a definitive mergeable / conflicting state. Drafts and
+	// closed PRs intentionally produce no badge.
+	BadgeMergeReady    = lipgloss.NewStyle().Foreground(Black).Background(NeonLime).Padding(0, 1).Bold(true)
+	BadgeMergeConflict = lipgloss.NewStyle().Foreground(Black).Background(NeonOrange).Padding(0, 1).Bold(true)
+
 	// Toasts
 	SuccessToast = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

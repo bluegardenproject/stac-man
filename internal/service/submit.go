@@ -8,6 +8,7 @@ import (
 
 	"github.com/philipptpunkt/stac-man/internal/gh"
 	"github.com/philipptpunkt/stac-man/internal/stack"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 )
 
 // SubmitOptions configures Submit.
@@ -20,6 +21,24 @@ type SubmitOptions struct {
 	// Body is the body for any newly-created PR. Existing PRs keep
 	// their body.
 	Body string
+	// NoRestack tells Submit to push branches even when their
+	// recorded ParentSHA is stale relative to the parent's tip,
+	// instead of skipping them with a "needs restack" message. The
+	// caller is responsible for understanding that the resulting
+	// PR may have a noisy diff; we surface every stale branch in
+	// SubmitReport.StaleParentSHA so the warning is unmissable.
+	NoRestack bool
+	// NoStackTable disables the auto-generated "Stack" block that
+	// Submit otherwise injects (or refreshes) at the top of every
+	// PR body, fenced by the stac-man sentinels. Useful when the
+	// user wants the PR description to stay strictly hand-edited.
+	NoStackTable bool
+	// Progress receives one Start / Done pair per long-running step
+	// (push, gh PR create/update, stack-table refresh) so the cmd
+	// layer can render a spinner or live status lines while Submit
+	// blocks on network I/O. Nil-safe: callers that don't want
+	// progress output should pass progress.Discard().
+	Progress progress.Reporter
 }
 
 // SubmitReport summarizes what Submit did per branch.
@@ -30,6 +49,7 @@ type SubmitReport struct {
 	Updated            []SubmitPR
 	Skipped            []SubmitSkip
 	DivergedStackmates []DivergedBranch // tracked branches with stale origin not in target list
+	StaleParentSHA     []string         // pushed via --no-restack despite a stale ParentSHA
 }
 
 // DivergedBranch records a tracked branch whose local tip differs
@@ -59,6 +79,12 @@ type SubmitSkip struct {
 // retargets it.
 func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport, error) {
 	r := SubmitReport{}
+	// Normalise the progress sink once so the rest of the function
+	// can call methods without a nil-check at every step.
+	if opts.Progress == nil {
+		opts.Progress = progress.Discard()
+	}
+	prog := opts.Progress
 	if err := s.EnsureRepo(ctx); err != nil {
 		return r, err
 	}
@@ -97,16 +123,23 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 	client := gh.New("")
 
 	for _, b := range targets {
-		// Refuse to push branches whose ParentSHA is stale: pushing
-		// without a clean restack would create a garbled PR.
+		// Refuse to push branches whose ParentSHA is stale unless the
+		// user opted into --no-restack. classifyStaleParent contains
+		// the actual decision so the per-flag behavior is exercised
+		// by a focused unit test instead of a full Submit run.
 		if b.Parent != "" && b.Parent != trunk {
 			parentTip, err := s.G.RevParse(ctx, b.Parent)
 			if err == nil && parentTip != b.ParentSHA {
-				r.Skipped = append(r.Skipped, SubmitSkip{
-					Branch: b.Name,
-					Reason: "needs restack — run `sm restack` first",
-				})
-				continue
+				switch classifyStaleParent(opts.NoRestack) {
+				case staleSkip:
+					r.Skipped = append(r.Skipped, SubmitSkip{
+						Branch: b.Name,
+						Reason: "needs restack — run `sm restack` first",
+					})
+					continue
+				case staleWarn:
+					r.StaleParentSHA = append(r.StaleParentSHA, b.Name)
+				}
 			}
 		}
 
@@ -120,13 +153,17 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		// no-op on; the very next `git push --force-with-lease`
 		// would catch the divergence anyway.
 		if inSync, err := s.G.RemoteMatchesLocal(ctx, b.Name); err == nil && inSync {
+			prog.Skip(fmt.Sprintf("%s already in sync with origin", b.Name))
 			r.SkippedPushes = append(r.SkippedPushes, b.Name)
 		} else {
+			prog.Start(fmt.Sprintf("pushing %s", b.Name))
 			// Force-with-lease because a previous restack will have
 			// rewritten history; plain push would be rejected.
 			if err := s.G.Push(ctx, b.Name, true); err != nil {
+				prog.Fail(fmt.Sprintf("pushing %s", b.Name))
 				return r, fmt.Errorf("pushing %s: %w", b.Name, err)
 			}
+			prog.Done(fmt.Sprintf("pushed %s", b.Name))
 			r.Pushed = append(r.Pushed, b.Name)
 		}
 	}
@@ -143,8 +180,13 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 
 		derivedTitle, derivedBody := s.derivePRMeta(ctx, b.Name, base)
 
+		// One progress step covers PRForBranch + the create / edit
+		// round-trip so the user sees a single "submitting PR for
+		// X" line per branch instead of two flickers.
+		prog.Start(fmt.Sprintf("submitting PR for %s", b.Name))
 		existing, ok, err := client.PRForBranch(ctx, b.Name)
 		if err != nil {
+			prog.Fail(fmt.Sprintf("submitting PR for %s", b.Name))
 			return r, err
 		}
 		if ok {
@@ -164,8 +206,12 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			}
 			if edits.Title != "" || edits.Body != "" || edits.Base != "" {
 				if err := client.EditPR(ctx, existing.Number, edits); err != nil {
+					prog.Fail(fmt.Sprintf("submitting PR for %s", b.Name))
 					return r, fmt.Errorf("editing #%d: %w", existing.Number, err)
 				}
+				prog.Done(fmt.Sprintf("updated PR #%d for %s", existing.Number, b.Name))
+			} else {
+				prog.Done(fmt.Sprintf("PR #%d for %s already up to date", existing.Number, b.Name))
 			}
 			r.Updated = append(r.Updated, SubmitPR{Branch: b.Name, Number: existing.Number, URL: existing.URL})
 			s.persistPR(ctx, b.Name, existing.Number)
@@ -188,8 +234,10 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			Draft: opts.Draft,
 		})
 		if err != nil {
+			prog.Fail(fmt.Sprintf("creating PR for %s", b.Name))
 			return r, fmt.Errorf("creating PR for %s: %w", b.Name, err)
 		}
+		prog.Done(fmt.Sprintf("created PR #%d for %s", num, b.Name))
 		r.Created = append(r.Created, SubmitPR{Branch: b.Name, Number: num})
 		s.persistPR(ctx, b.Name, num)
 	}
@@ -206,7 +254,97 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		r.DivergedStackmates = s.divergedStackmates(ctx, g, current, targets)
 	}
 
+	// Stack-table pass runs AFTER every PR exists, because each PR's
+	// body needs to reference siblings whose numbers were unknown
+	// when their own create/update call ran. Skips silently when
+	// the user opted out via --no-stack-table.
+	if !opts.NoStackTable {
+		s.applyStackTables(ctx, client, g, targets, &r, prog)
+	}
+
+	// Submit can change CI state (push triggers a fresh run) and
+	// mergeability (retargeted base, new tip on origin). The cache
+	// would otherwise serve the pre-push status to the very next
+	// `sm log`, defeating the round-trip we just paid for.
+	if gitDir, err := s.G.GitDir(ctx); err == nil {
+		_ = gh.InvalidateChecksCache(gitDir)
+	}
+
 	return r, nil
+}
+
+// applyStackTables walks every target with a known PR number and
+// rewrites its PR body so the stac-man-fenced "Stack" block reflects
+// the current chain. Idempotent: a branch whose body already carries
+// the same block is left alone (no needless `gh pr edit` round-trip),
+// and re-runs of `sm submit` simply replace the block in-place.
+//
+// Each target costs one `gh pr view` (for the latest body) plus an
+// optional `gh pr edit` when the body actually changes. Errors are
+// best-effort — a flaky gh round-trip shouldn't fail the whole
+// submit when the PRs themselves were created/updated successfully.
+func (s *Service) applyStackTables(ctx context.Context, client *gh.Client, g *stack.Graph, targets []stack.Branch, r *SubmitReport, prog progress.Reporter) {
+	prByBranch := buildPRMap(g, *r)
+	if len(prByBranch) == 0 {
+		return
+	}
+	for _, t := range targets {
+		if containsSkip(r.Skipped, t.Name) {
+			continue
+		}
+		num, ok := prByBranch[t.Name]
+		if !ok || num == 0 {
+			continue
+		}
+		chain := stackChainForBranch(g, t.Name)
+		table := renderStackTable(chain, t.Name, prByBranch)
+		if table == "" {
+			continue
+		}
+		// Re-fetch so a manual edit between the create/update call
+		// above and this pass is preserved outside the sentinels.
+		existing, ok, err := client.PRForBranch(ctx, t.Name)
+		if err != nil || !ok {
+			continue
+		}
+		newBody := injectStackTable(existing.Body, table)
+		if newBody == existing.Body {
+			continue
+		}
+		// Only announce stack-table refreshes that actually issue
+		// an edit — silent no-ops would clutter the spinner output
+		// with one line per PR even when nothing changed.
+		prog.Start(fmt.Sprintf("refreshing stack table on PR #%d", num))
+		if err := client.EditPR(ctx, num, gh.EditPROptions{Body: newBody}); err != nil {
+			prog.Fail(fmt.Sprintf("refreshing stack table on PR #%d", num))
+			continue
+		}
+		prog.Done(fmt.Sprintf("refreshed stack table on PR #%d", num))
+	}
+}
+
+// buildPRMap merges the persisted PR numbers from the stack graph
+// with the freshly-allocated numbers from this submit run. Created
+// PRs land first, followed by Updated, so a re-run that recreates a
+// branch (rare but possible) overrides the stale stored number.
+func buildPRMap(g *stack.Graph, r SubmitReport) map[string]int {
+	out := map[string]int{}
+	for _, b := range g.Branches() {
+		if b.PR > 0 {
+			out[b.Name] = b.PR
+		}
+	}
+	for _, p := range r.Updated {
+		if p.Number > 0 {
+			out[p.Branch] = p.Number
+		}
+	}
+	for _, p := range r.Created {
+		if p.Number > 0 {
+			out[p.Branch] = p.Number
+		}
+	}
+	return out
 }
 
 // divergedStackmates returns tracked branches whose local tip
@@ -339,4 +477,32 @@ func containsSkip(skips []SubmitSkip, branch string) bool {
 		}
 	}
 	return false
+}
+
+// staleParentAction is the outcome of the parent-SHA freshness check
+// for a single submit target. Exists as a typed value so the no-flag
+// vs --no-restack split has one obvious place in the codebase.
+type staleParentAction int
+
+const (
+	// staleSkip removes the branch from the push and PR-edit loop and
+	// records a "needs restack" entry in SubmitReport.Skipped. This is
+	// the historical default — users had to restack before submitting
+	// any branch with a stale parent.
+	staleSkip staleParentAction = iota
+	// staleWarn lets the push proceed but records the branch in
+	// SubmitReport.StaleParentSHA so the user has an unmissable signal
+	// that the resulting PR may show parent commits in its diff.
+	staleWarn
+)
+
+// classifyStaleParent returns the action Submit should take when a
+// target's recorded ParentSHA differs from the parent's tip.
+// noRestack is opts.NoRestack: setting it (the new --no-restack flag)
+// flips the default skip into a non-fatal warning + push.
+func classifyStaleParent(noRestack bool) staleParentAction {
+	if noRestack {
+		return staleWarn
+	}
+	return staleSkip
 }

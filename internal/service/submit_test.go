@@ -313,6 +313,25 @@ func TestDerivePRMetaEmptyChain(t *testing.T) {
 	}
 }
 
+// TestClassifyStaleParentDefaultSkips pins the historical contract
+// users coming from v2.0 rely on: a stale ParentSHA always blocks
+// the push unless the user opts in via --no-restack.
+func TestClassifyStaleParentDefaultSkips(t *testing.T) {
+	if got := classifyStaleParent(false); got != staleSkip {
+		t.Fatalf("classifyStaleParent(false) = %v, want staleSkip", got)
+	}
+}
+
+// TestClassifyStaleParentNoRestackWarns pins the new --no-restack
+// behaviour: the same stale ParentSHA now flows through to
+// SubmitReport.StaleParentSHA instead of SubmitReport.Skipped, and
+// the branch is pushed regardless.
+func TestClassifyStaleParentNoRestackWarns(t *testing.T) {
+	if got := classifyStaleParent(true); got != staleWarn {
+		t.Fatalf("classifyStaleParent(true) = %v, want staleWarn", got)
+	}
+}
+
 // TestDerivePRMetaSingleCommitNoBody pins the "subject only" commit
 // case: a commit with no body should produce a non-empty title and
 // an empty body, so the non-destructive update path in Submit (which

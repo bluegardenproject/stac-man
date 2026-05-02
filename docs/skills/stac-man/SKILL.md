@@ -50,17 +50,17 @@ sm submit --stack
 |---|---|
 | `sm create <name>` | Creates a new branch off HEAD; records the previous branch as its parent. With `-m` and `-a` it commits in one step. |
 | `sm modify [-c] [-a] [-m msg]` | Default: amends the current commit. With `-c` creates a new commit. With `-a` stages all changes first. **Always restacks descendants automatically.** |
-| `sm log` (alias: `ls`) | Renders the stack tree from trunk down, with current-branch / needs-restack / PR markers. |
+| `sm log` (alias: `ls`) | Renders the stack tree from trunk down, with current-branch / needs-restack / PR markers plus per-row CI and mergeability badges (cached for 60s). `--no-pr` / `--no-checks` / `--no-merge-status` opt out of each column. `--json` emits the same graph as one document (per-branch shape matches `sm show --json`); `--porcelain` emits stable tab-separated rows. |
 | `sm checkout [name]` (alias: `co`) | Switch HEAD to a tracked branch. Without arg, lists choices. |
 | `sm up` / `sm down` / `sm top` / `sm bottom` | Walk the stack relative to current. `--first` resolves forks alphabetically. |
 | `sm restack [branch]` | Rebases the chain rooted at branch onto current parent tips. Pauses on conflict. |
 | `sm continue` / `sm abort` | Resume or bail out of a paused restack/sync. |
 | `sm sync` | Fetch, fast-forward trunk, delete merged branches, restack survivors. |
-| `sm submit [--stack] [--draft]` | Push branch(es) and open or update PRs via `gh`, wiring base branches correctly. |
+| `sm submit [--stack] [--draft] [--no-restack] [--no-stack-table]` | Push branch(es) and open or update PRs via `gh`, wiring base branches correctly. After every PR exists, refreshes a sentinel-fenced "Stack" block at the top of each PR body so reviewers see the chain and their position in it; `--no-stack-table` opts out. `--no-restack` pushes branches whose recorded parent SHA is stale instead of skipping them. |
 | `sm track [branch] [--parent X]` / `sm untrack [--reparent]` | Adopt or forget existing branches into/out of the stack graph. |
 | `sm parent [--set X]` / `sm children` | Inspect or reassign parent/child relationships. |
 | `sm fold [-m msg]` | Squash the current branch into its parent and re-parent any children. |
-| `sm doctor` (alias: `status`) | Sanity-check stac-man metadata vs. git state. Print first whenever the user reports something weird. |
+| `sm doctor` (alias: `status`) | Sanity-check stac-man metadata vs. git state, and surface PRs GitHub reports as `CONFLICTING` in a louder block. Print first whenever the user reports something weird, and especially after a `sm sync` that rewrote ancestors. |
 | `sm absorb [--base X]` | Auto-route uncommitted hunks into the right ancestor commits (wraps `git-absorb`), then restacks descendants. **Most agent-relevant new verb** — replaces a manual amend-and-restack loop. |
 | `sm move --onto X [branch]` | Reparent a branch (and its subtree) onto a new base; descendants ride along. |
 | `sm land [--squash\|--merge\|--rebase] [--force]` | Merge the bottom-most PR via `gh pr merge` and run `sm sync` to clean up. CI-green gate by default. |
@@ -81,7 +81,7 @@ sm submit --stack
 - **User has uncommitted fixups for prior commits in the stack:** prefer `sm absorb` over manually `git commit --fixup` + `git rebase --autosquash`; absorb does both and cascades the restack.
 - **Pulling someone else's stack to review:** prefer `sm get <PR>` over multiple `gh pr checkout` invocations — it sets the parent metadata so `sm log` mirrors the author's tree.
 - **User wants to undo what `sm` just did:** prefer `sm undo` over manual `git reset` + git config edits. Refuses while a rebase is paused — finish or abort first.
-- **Reading branch state programmatically:** prefer `sm show --json` over scraping `sm log`.
+- **Reading branch state programmatically:** for one branch, use `sm show --json`. For the whole stack, use `sm log --json` (or `sm log --porcelain` from shell pipelines). Both share the same per-branch `pr` shape so a single parser handles either.
 
 ## Conflict handling
 

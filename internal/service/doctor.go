@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/philipptpunkt/stac-man/internal/gh"
 	"github.com/philipptpunkt/stac-man/internal/stack"
 )
 
@@ -12,11 +13,21 @@ import (
 type DoctorReport struct {
 	Trunk          string
 	TrackedCount   int
-	NeedsRestack   []string // branches whose ParentSHA is stale
-	StaleSHA       []string // branches whose recorded parent commit doesn't exist
-	DriftedParent  []string // recorded parent SHA exists but is not in the branch's history
-	UntrackedRoots []string // local branches that look like stack roots but aren't tracked
-	Issues         []string // graph-level errors (cycles, missing parents)
+	NeedsRestack   []string        // branches whose ParentSHA is stale
+	StaleSHA       []string        // branches whose recorded parent commit doesn't exist
+	DriftedParent  []string        // recorded parent SHA exists but is not in the branch's history
+	UntrackedRoots []string        // local branches that look like stack roots but aren't tracked
+	MergeConflicts []MergeConflict // PRs GitHub reports as CONFLICTING
+	Issues         []string        // graph-level errors (cycles, missing parents)
+}
+
+// MergeConflict identifies a tracked branch whose PR is reported as
+// CONFLICTING by GitHub. The doctor surfaces these as a louder block
+// than `sm log`'s ⚠ glyph so the user has to acknowledge the
+// conflict before continuing.
+type MergeConflict struct {
+	Branch string
+	PR     int
 }
 
 // Doctor sanity-checks stac-man's metadata against the git working
@@ -89,7 +100,54 @@ func (s *Service) Doctor(ctx context.Context) (DoctorReport, error) {
 		}
 	}
 
+	r.MergeConflicts = s.detectMergeConflicts(ctx, tracked)
+
 	return r, nil
+}
+
+// detectMergeConflicts asks GitHub for the mergeability of each
+// tracked branch with a PR and returns the ones GitHub flags as
+// CONFLICTING. The check is best-effort: gh missing, no auth, or
+// parse failures collapse to "no conflicts surfaced" rather than
+// failing the whole doctor run, because doctor must always work
+// offline (its primary purpose is local-metadata sanity).
+//
+// We deliberately skip drafts here too — a draft PR can sit in
+// CONFLICTING for weeks without being actionable, and the explicit
+// doctor block is meant to flag PRs the user is preparing to land.
+func (s *Service) detectMergeConflicts(ctx context.Context, tracked []stack.Branch) []MergeConflict {
+	prMap := map[string]gh.PR{}
+	for _, b := range tracked {
+		if b.PR == 0 {
+			continue
+		}
+		// PRStateOpen as a placeholder so fetchPRStatuses doesn't
+		// short-circuit on closed/merged. Real state comes back in
+		// the gh.PRStatus we receive.
+		prMap[b.Name] = gh.PR{Number: b.PR, State: gh.PRStateOpen}
+	}
+	if len(prMap) == 0 {
+		return nil
+	}
+	statuses := s.fetchPRStatuses(ctx, prMap, statusFetchOptions{wantMerge: true})
+	var out []MergeConflict
+	for _, b := range tracked {
+		st, ok := statuses[b.Name]
+		if !ok {
+			continue
+		}
+		if st.IsDraft {
+			continue
+		}
+		if st.State == gh.PRStateMerged || st.State == gh.PRStateClosed {
+			continue
+		}
+		if st.Mergeable != gh.MergeConflicting {
+			continue
+		}
+		out = append(out, MergeConflict{Branch: b.Name, PR: b.PR})
+	}
+	return out
 }
 
 func short(sha string) string {

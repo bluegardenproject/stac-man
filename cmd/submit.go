@@ -2,31 +2,43 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/philipptpunkt/stac-man/internal/service"
 	"github.com/philipptpunkt/stac-man/internal/ui"
+	"github.com/philipptpunkt/stac-man/internal/ui/progress"
 	"github.com/philipptpunkt/stac-man/internal/ui/theme"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	var (
-		stack bool
-		draft bool
-		body  string
+		stack        bool
+		draft        bool
+		body         string
+		noRestack    bool
+		noStackTable bool
 	)
 	cmd := &cobra.Command{
 		Use:   "submit",
 		Short: "Push branches and open/update PRs via gh",
 		Long: "Pushes the current branch (or, with --stack, the current branch and every " +
 			"descendant) to origin and opens or updates pull requests via the gh CLI. " +
-			"Existing PRs are retargeted when their base branch has changed locally.",
+			"Existing PRs are retargeted when their base branch has changed locally. " +
+			"Each PR body gets a sentinel-fenced \"Stack\" block at the top showing " +
+			"every PR in the chain and the reviewer's position in it; pass --no-stack-table " +
+			"to opt out. Branches whose recorded parent SHA is stale are skipped with a " +
+			"\"needs restack\" message by default; pass --no-restack to push them anyway " +
+			"and accept the noisy diff.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			r, err := newService().Submit(c.Context(), service.SubmitOptions{
-				Stack: stack,
-				Draft: draft,
-				Body:  body,
+				Stack:        stack,
+				Draft:        draft,
+				Body:         body,
+				NoRestack:    noRestack,
+				NoStackTable: noStackTable,
+				Progress:     progress.New(os.Stdout),
 			})
 			renderSubmitReport(r)
 			return err
@@ -35,6 +47,8 @@ func init() {
 	cmd.Flags().BoolVar(&stack, "stack", false, "submit every ancestor, the current branch, and every descendant (idempotent: branches already in sync with origin are not re-pushed)")
 	cmd.Flags().BoolVar(&draft, "draft", false, "create new PRs as drafts (existing PRs unchanged)")
 	cmd.Flags().StringVar(&body, "body", "", "PR body for newly-created PRs")
+	cmd.Flags().BoolVar(&noRestack, "no-restack", false, "push branches even when their recorded parent SHA is stale (warn instead of skip)")
+	cmd.Flags().BoolVar(&noStackTable, "no-stack-table", false, "do not inject the auto-generated stack table into PR bodies")
 
 	register(cmd)
 }
@@ -63,6 +77,13 @@ func renderSubmitReport(r service.SubmitReport) {
 		for _, b := range r.SkippedPushes {
 			fmt.Println("  " + ui.Render(theme.Dimmed, b))
 		}
+	}
+	if len(r.StaleParentSHA) > 0 {
+		fmt.Println(ui.Render(theme.Warn, "pushed with stale parent SHA (--no-restack):"))
+		for _, b := range r.StaleParentSHA {
+			fmt.Println("  " + ui.Render(theme.BranchNeedsRestack, b))
+		}
+		fmt.Println(ui.Render(theme.Dimmed, "  → diff on GitHub may include parent commits; run `sm restack` then `sm submit` to clean up."))
 	}
 	if len(r.Skipped) > 0 {
 		fmt.Println(ui.Render(theme.Warn, "skipped:"))
