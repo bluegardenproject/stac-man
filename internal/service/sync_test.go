@@ -419,3 +419,137 @@ func TestUntrackAndDeleteUnsetsMergedBranch(t *testing.T) {
 		t.Fatal("mergedBranch metadata still tracked after untrackAndDelete")
 	}
 }
+
+// TestUntrackAndDeleteSkipsAlreadyDeletedChild pins down the bug fix
+// that prevents ghost-branch resurrection during a multi-branch
+// merged-stack cleanup. In a single Sync run the in-memory graph
+// snapshot is shared across iterations; a deepest-first deletion
+// order means later iterations of untrackAndDelete keep seeing
+// already-deleted descendants in g.ChildrenOf. The pre-fix code
+// blindly called SetBranch on each, which silently re-created the
+// ghost with only Parent populated (no ParentSHA, no PR) — and the
+// next `sm sync` then crashed on rev-parse because the local ref no
+// longer existed.
+//
+// The fix is: when GetBranch returns ok=false the loop continues
+// without writing anything back. This test wires up exactly that
+// race: a merged branch whose graph-recorded child is missing from
+// the store, and asserts that no metadata appears for that child
+// after the call.
+func TestUntrackAndDeleteSkipsAlreadyDeletedChild(t *testing.T) {
+	ctx := context.Background()
+	mem := memory.New()
+	if err := mem.SetRepo(ctx, store.RepoMeta{Trunk: "main", Version: 1}); err != nil {
+		t.Fatalf("SetRepo: %v", err)
+	}
+	// Build the graph from a state that DOES include the child, so
+	// g.ChildrenOf("mergedBranch") returns ["ghost"]. Then unset the
+	// child before calling untrackAndDelete — this models the
+	// "earlier iteration already cleaned this branch" race.
+	if err := mem.SetBranch(ctx, "mergedBranch", store.BranchMeta{Parent: "main", ParentSHA: "sha-main"}); err != nil {
+		t.Fatalf("SetBranch mergedBranch: %v", err)
+	}
+	if err := mem.SetBranch(ctx, "ghost", store.BranchMeta{Parent: "mergedBranch", ParentSHA: "sha-merged", PR: 42}); err != nil {
+		t.Fatalf("SetBranch ghost: %v", err)
+	}
+	g, err := stack.Load(ctx, mem)
+	if err != nil {
+		t.Fatalf("stack.Load: %v", err)
+	}
+	if err := mem.UnsetBranch(ctx, "ghost"); err != nil {
+		t.Fatalf("UnsetBranch ghost: %v", err)
+	}
+
+	runner := scriptedRunner{byCmd: map[string]string{"rev-parse": "sha-main"}}
+	svc := &Service{G: git.NewWithRunner(runner), Store: mem}
+
+	if _, err := svc.untrackAndDelete(ctx, g, "mergedBranch", "main"); err != nil {
+		t.Fatalf("untrackAndDelete: %v", err)
+	}
+	if meta, ok, _ := mem.GetBranch(ctx, "ghost"); ok {
+		t.Fatalf("ghost child resurrected as %#v; want no entry in store", meta)
+	}
+}
+
+// TestProcessMergedBranchesCascadeReparentsSurvivor exercises the
+// other half of the same bug family: a multi-deep merged chain
+// whose surviving descendant has to walk through every layer to
+// land at trunk. Without the per-iteration graph reload, the
+// in-memory snapshot keeps reporting the descendant under whichever
+// branch it was originally rooted on, so only the FIRST iteration
+// reparents it; subsequent iterations don't see it as a child of
+// the branch they're deleting and the descendant ends up pointing
+// at a branch that just got removed.
+//
+// Topology: main → A → B → C → survivor. A, B, and C are merged
+// (deepest-first: [C, B, A]); survivor must end up parented at main.
+//
+// retargetPlan should also fire once per layer for the surviving
+// PR's base, walking it main-ward as each ancestor is removed.
+func TestProcessMergedBranchesCascadeReparentsSurvivor(t *testing.T) {
+	ctx := context.Background()
+	mem := memory.New()
+	if err := mem.SetRepo(ctx, store.RepoMeta{Trunk: "main", Version: 1}); err != nil {
+		t.Fatalf("SetRepo: %v", err)
+	}
+	for _, b := range []struct {
+		name, parent string
+		pr           int
+	}{
+		{"A", "main", 11},
+		{"B", "A", 12},
+		{"C", "B", 13},
+		{"survivor", "C", 99},
+	} {
+		if err := mem.SetBranch(ctx, b.name, store.BranchMeta{Parent: b.parent, ParentSHA: "sha-" + b.parent, PR: b.pr}); err != nil {
+			t.Fatalf("SetBranch %s: %v", b.name, err)
+		}
+	}
+
+	runner := scriptedRunner{}
+	svc := &Service{G: git.NewWithRunner(runner), Store: mem}
+
+	plan, err := svc.processMergedBranches(ctx, []string{"C", "B", "A"}, "main")
+	if err != nil {
+		t.Fatalf("processMergedBranches: %v", err)
+	}
+
+	got, ok, err := mem.GetBranch(ctx, "survivor")
+	if err != nil {
+		t.Fatalf("GetBranch survivor: %v", err)
+	}
+	if !ok {
+		t.Fatal("survivor metadata missing after cleanup; the cascade must reparent it, not delete it")
+	}
+	if got.Parent != "main" {
+		t.Fatalf("survivor.Parent = %q, want main; cascade should walk through all merged ancestors", got.Parent)
+	}
+
+	// Each layer of the chain should produce one retarget entry for
+	// the survivor's PR, walking the base main-ward. Order: C → B,
+	// then B → A, then A → main. Without the per-iteration graph
+	// reload the survivor is invisible to layers 2 and 3, so we'd
+	// see only the first retarget.
+	wantBases := []string{"B", "A", "main"}
+	if len(plan) != len(wantBases) {
+		t.Fatalf("plan = %d entries (%v), want %d for the survivor's three-layer walk", len(plan), plan, len(wantBases))
+	}
+	for i, want := range wantBases {
+		if plan[i].Branch != "survivor" {
+			t.Fatalf("plan[%d].Branch = %q, want survivor", i, plan[i].Branch)
+		}
+		if plan[i].PR != 99 {
+			t.Fatalf("plan[%d].PR = %d, want 99", i, plan[i].PR)
+		}
+		if plan[i].NewBase != want {
+			t.Fatalf("plan[%d].NewBase = %q, want %q", i, plan[i].NewBase, want)
+		}
+	}
+
+	// And no ghost entries for the deleted ancestors should remain.
+	for _, name := range []string{"A", "B", "C"} {
+		if meta, ok, _ := mem.GetBranch(ctx, name); ok {
+			t.Fatalf("deleted ancestor %q still in store as %#v; resurrection bug regressed", name, meta)
+		}
+	}
+}

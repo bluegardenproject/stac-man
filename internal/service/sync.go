@@ -219,28 +219,33 @@ func (s *Service) Sync(ctx context.Context) (SyncReport, error) {
 	merged = sortMergedByDepth(g, merged, trunk)
 	r.MergedBranches = merged
 
-	for _, b := range merged {
-		retargets, err := s.untrackAndDelete(ctx, g, b, trunk)
-		if err != nil {
-			return r, fmt.Errorf("untracking merged branch %s: %w", b, err)
+	// Phase 1: rewrite local metadata (delete merged branches and
+	// cascade-reparent surviving descendants). Network-free so a
+	// failure here can't leave GitHub partially updated. The helper
+	// reloads the graph between iterations so cascade reparenting
+	// follows the chain through every layer.
+	retargetEntries, err := s.processMergedBranches(ctx, merged, trunk)
+	if err != nil {
+		return r, err
+	}
+
+	// Phase 2: tell GitHub about the new parent edges. EditPR
+	// failures are recorded per-entry but never abort the run —
+	// flaky network is not a reason to undo the local cleanup
+	// we just finished.
+	if len(retargetEntries) > 0 && ghClient == nil {
+		// We arrive here only when the merged set has child PRs
+		// but no other tracked branch had a PR record before —
+		// rare but possible if metadata was hand-edited. Construct
+		// gh on demand so retargeting still works.
+		ghClient = gh.New("")
+	}
+	for _, e := range retargetEntries {
+		rp := RetargetedPR{Branch: e.Branch, PR: e.PR, NewBase: e.NewBase}
+		if err := ghClient.EditPR(ctx, e.PR, gh.EditPROptions{Base: e.NewBase}); err != nil {
+			rp.Err = err.Error()
 		}
-		if len(retargets) == 0 {
-			continue
-		}
-		if ghClient == nil {
-			// We arrive here only when a merged branch has child
-			// PRs but no other branch had a PR record before — rare
-			// but possible if metadata was hand-edited. Construct
-			// gh on demand so retargeting still works.
-			ghClient = gh.New("")
-		}
-		for _, e := range retargets {
-			rp := RetargetedPR{Branch: e.Branch, PR: e.PR, NewBase: e.NewBase}
-			if err := ghClient.EditPR(ctx, e.PR, gh.EditPROptions{Base: e.NewBase}); err != nil {
-				rp.Err = err.Error()
-			}
-			r.RetargetedPRs = append(r.RetargetedPRs, rp)
-		}
+		r.RetargetedPRs = append(r.RetargetedPRs, rp)
 	}
 
 	// Reload the graph after deletions, then restack every surviving
@@ -367,9 +372,26 @@ func (s *Service) untrackAndDelete(ctx context.Context, g *stack.Graph, branch, 
 	}
 	retargets := retargetPlan(g, branch, parent)
 	for _, child := range g.ChildrenOf(branch) {
-		meta, _, err := s.Store.GetBranch(ctx, child.Name)
+		meta, ok, err := s.Store.GetBranch(ctx, child.Name)
 		if err != nil {
 			return nil, err
+		}
+		if !ok {
+			// The "child" is a ghost: it appears in the in-memory
+			// graph snapshot the caller passed us, but its store
+			// metadata has already been removed — typically by an
+			// earlier untrackAndDelete call in the same Sync run
+			// where this branch was a deeper merged ancestor. If we
+			// fell through and called SetBranch we'd resurrect the
+			// ghost with only Parent populated (no ParentSHA, no
+			// PR), and the next Sync would see a tracked branch
+			// with no local ref and crash on the rev-parse during
+			// the restack walk. Skipping is safe: we already deleted
+			// this branch's metadata, the caller (processMergedBranches)
+			// reloads the graph between iterations so the next
+			// pass sees the updated tree, and the actual surviving
+			// descendant gets reparented through that fresh view.
+			continue
 		}
 		// Update only the Parent name; intentionally leave ParentSHA
 		// at its current value (the merged branch's tip from the
@@ -399,6 +421,42 @@ func (s *Service) untrackAndDelete(ctx context.Context, g *stack.Graph, branch, 
 		return nil, err
 	}
 	return retargets, nil
+}
+
+// processMergedBranches deletes each merged branch in order, reloading
+// the stack graph between iterations so each iteration sees the
+// post-deletion topology produced by the previous one. Returns the
+// accumulated PR-retarget plan (one entry per child PR whose base
+// must move to its new ancestor on GitHub).
+//
+// Why reload between iterations: cleanup proceeds deepest-first, so
+// later iterations need to know about reparenting decisions made by
+// earlier ones — otherwise a surviving descendant whose chain runs
+// through several merged ancestors loses every step of the cascade
+// after the first, and ends up pointing at a deleted parent. The
+// per-iteration reload is cheap (the store is local git config) and
+// keeps the cascade O(merged) instead of O(merged²) in the number
+// of repeated SetBranch calls a single-pass approach would require
+// to fix up survivors at every layer.
+//
+// gh PR retargets are NOT issued from here — the returned plan is
+// applied separately by Sync so the metadata-rewrite phase stays
+// network-free and a partially-failed gh round-trip leaves local
+// state fully consistent.
+func (s *Service) processMergedBranches(ctx context.Context, merged []string, trunk string) ([]retargetEntry, error) {
+	var plan []retargetEntry
+	for _, b := range merged {
+		g, err := stack.Load(ctx, s.Store)
+		if err != nil {
+			return plan, err
+		}
+		retargets, err := s.untrackAndDelete(ctx, g, b, trunk)
+		if err != nil {
+			return plan, fmt.Errorf("untracking merged branch %s: %w", b, err)
+		}
+		plan = append(plan, retargets...)
+	}
+	return plan, nil
 }
 
 func contains(s []string, x string) bool {
