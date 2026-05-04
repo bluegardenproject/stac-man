@@ -13,6 +13,9 @@ import (
 
 	"github.com/bluegardenproject/stac-man/internal/config"
 	"github.com/bluegardenproject/stac-man/internal/tui/cockpit"
+	"github.com/bluegardenproject/stac-man/internal/ui"
+	"github.com/bluegardenproject/stac-man/internal/ui/theme"
+	"github.com/bluegardenproject/stac-man/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +24,12 @@ import (
 // A package-level var (rather than a context value) keeps subcommands
 // from threading it through every call.
 var loadedConfig = config.Default()
+
+// updateNotifier coordinates the once-per-day background check for a
+// newer release. We hold a single instance so the sync.Once inside it
+// applies across the whole process — re-entrant calls (e.g. the
+// cockpit running a child subcommand) don't fire multiple goroutines.
+var updateNotifier update.Notifier
 
 // LoadedConfig returns the user config that was loaded once at
 // startup. Always safe to call: defaults are used when no file
@@ -104,6 +113,16 @@ func newRootCmd() *cobra.Command {
 			if flagNoColor || cfg.Color == config.ColorNever {
 				_ = os.Setenv("NO_COLOR", "1")
 			}
+
+			if shouldNotifyUpdates(cmd) {
+				updateNotifier.Refresh(cmd.Context())
+			}
+			return nil
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			if shouldNotifyUpdates(cmd) {
+				printUpdateHintIfStale()
+			}
 			return nil
 		},
 	}
@@ -116,6 +135,49 @@ func newRootCmd() *cobra.Command {
 	}
 
 	return root
+}
+
+// shouldNotifyUpdates decides whether the post-run nag is appropriate
+// for this invocation. We skip:
+//
+//   - Dev builds — they can't self-update anyway.
+//   - The `update` and `version` subcommands — they print their own
+//     version output, the nag would be redundant noise.
+//   - Non-TTY stdout — we don't pollute pipes / CI logs.
+//   - When NO_UPDATE_NOTIFIER is set — standard opt-out env var
+//     respected by other CLIs (npm, gh, etc).
+func shouldNotifyUpdates(cmd *cobra.Command) bool {
+	if Version == "dev" || Version == "unknown" {
+		return false
+	}
+	if os.Getenv("NO_UPDATE_NOTIFIER") != "" {
+		return false
+	}
+	if !stdoutIsTTY() {
+		return false
+	}
+	switch cmd.Name() {
+	case "update", "version", "help", "completion":
+		return false
+	}
+	return true
+}
+
+// printUpdateHintIfStale prints a single dim line to stderr when the
+// cached "latest release" tag is newer than the running binary. The
+// nag goes to stderr so it never contaminates stdout-capture in
+// scripts that are TTY-heuristic-blind.
+func printUpdateHintIfStale() {
+	latest, ok := update.CachedLatest()
+	if !ok {
+		return
+	}
+	if update.Compare(Version, latest) >= 0 {
+		return
+	}
+	msg := fmt.Sprintf("↑ stac-man %s is available (you're on %s). Run `sm update` to install.",
+		latest, Version)
+	fmt.Fprintln(os.Stderr, ui.Render(theme.Dimmed, msg))
 }
 
 // Execute runs the root command. Cancellation from ctx is passed through
