@@ -1,10 +1,22 @@
 name: Deploy docs
 
-# Manual-trigger only for now. Click "Run workflow" in the Actions tab
-# when you want to publish a docs cut. To flip to auto-deploy later,
-# add a `push` trigger with path filters on `docs/**` and
-# `internal/ui/theme/palette.json`.
+# Auto-deploy on every push to `develop` that actually touches the
+# docs source — VitePress content, the shared brand palette, or this
+# workflow itself. Manual runs are still allowed from any branch via
+# the Actions tab.
+#
+# Heads-up: the `deploy` job below targets the `github-pages`
+# environment. Repo Settings → Environments → github-pages must list
+# `develop` (or "All branches") under "Deployment branches and tags",
+# otherwise the deploy step will be blocked even when the build
+# succeeds.
 on:
+  push:
+    branches: [develop]
+    paths:
+      - 'docs/**'
+      - 'internal/ui/theme/palette.json'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
