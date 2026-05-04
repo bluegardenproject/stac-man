@@ -21,6 +21,9 @@ type Git interface {
 	RebaseInProgress(ctx context.Context) (bool, error)
 	RebaseContinue(ctx context.Context) error
 	RebaseAbort(ctx context.Context) error
+	// ConflictPaths is consulted by Engine.Paused to surface the
+	// list of unmerged files alongside the on-disk pending queue.
+	ConflictPaths(ctx context.Context) ([]string, error)
 }
 
 // Engine orchestrates the rebase walk for `sm restack` / `sm sync`.
