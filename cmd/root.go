@@ -8,11 +8,24 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 
+	"github.com/bluegardenproject/stac-man/internal/config"
 	"github.com/bluegardenproject/stac-man/internal/tui/cockpit"
 	"github.com/spf13/cobra"
 )
+
+// loadedConfig holds the parsed ~/.config/stac-man/config.yaml after
+// PersistentPreRunE has run. Subcommands read it via LoadedConfig().
+// A package-level var (rather than a context value) keeps subcommands
+// from threading it through every call.
+var loadedConfig = config.Default()
+
+// LoadedConfig returns the user config that was loaded once at
+// startup. Always safe to call: defaults are used when no file
+// exists.
+func LoadedConfig() config.Config { return loadedConfig }
 
 // Version and BuildTime are set by main.SetVersion at process start.
 // They live in package main so Release Please's `extra-files` config
@@ -74,7 +87,21 @@ func newRootCmd() *cobra.Command {
 			return cockpit.Run(c.Context(), newService())
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if flagNoColor {
+			cfg, err := config.Load()
+			if err != nil {
+				// A broken config should not silently revert to
+				// defaults — the user typed something wrong and
+				// deserves to know. Print to stderr and continue
+				// with defaults so they can still run `sm config
+				// edit` to fix it.
+				fmt.Fprintln(os.Stderr, "warning:", err)
+			}
+			loadedConfig = cfg
+
+			// --no-color CLI flag wins; otherwise honor config.
+			// "always" is best-effort: ColorEnabled() still
+			// suppresses ANSI when stdout isn't a TTY.
+			if flagNoColor || cfg.Color == config.ColorNever {
 				_ = os.Setenv("NO_COLOR", "1")
 			}
 			return nil
