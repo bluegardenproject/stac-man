@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.0.0](https://github.com/bluegardenproject/stac-man/compare/v0.2.1...v1.0.0) (2026-05-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **tui:** bare `sm` on a TTY now launches the interactive cockpit instead of printing help. Run `sm --help` (or any explicit subcommand) for the previous behaviour. Non-TTY invocations are unchanged.
+
+### Features
+
+* **config:** load user config and add `sm config` command ([f5d1153](https://github.com/bluegardenproject/stac-man/commit/f5d1153372bbd30e53a0c2b294f74ad4aedcc63a))
+* **docs:** add stac-man branding to site and README ([3080acd](https://github.com/bluegardenproject/stac-man/commit/3080acd9ad62f14b97a097c6da70208486bb2b99))
+* **docs:** align site theme with stac-man logo palette ([0566a54](https://github.com/bluegardenproject/stac-man/commit/0566a5415f33ddf37ca9a619fc9d3aa17c07296a))
+* **install:** broaden shell coverage and add uninstaller ([61b6d57](https://github.com/bluegardenproject/stac-man/commit/61b6d5708de3cef9ff40a951055cb016471a3a40))
+* **tui:** add interactive cockpit ([2542854](https://github.com/bluegardenproject/stac-man/commit/254285457cc2889a17295725efbde248ee764c7a))
+* **update:** background notifier for new releases ([f77edf8](https://github.com/bluegardenproject/stac-man/commit/f77edf8f84ed44760da45daaab06d08a0ef6d91a))
+
+
+### Documentation
+
+* ship cockpit, rename docs/site to docs/web, enforce pasteable shell blocks ([1047280](https://github.com/bluegardenproject/stac-man/commit/10472805120a9fc45b2346fa3d8708f6729bd9a4))
+
+
+### Miscellaneous
+
+* **hooks:** add pre-commit gofmt check ([dc865ac](https://github.com/bluegardenproject/stac-man/commit/dc865ace6174879896d325bf19c1146b47557fc5))
+
 ## [0.2.1](https://github.com/bluegardenproject/stac-man/compare/v0.2.0...v0.2.1) (2026-05-02)
 
 
