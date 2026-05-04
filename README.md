@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scr
 iwr -useb https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/install.ps1 | iex
 ```
 
-Verify with `sm --version`. Full install notes: [Get Started → Install](https://bluegardenproject.github.io/stac-man/get-started/install).
+Verify with `sm --version`. Full install notes (including [uninstall](https://bluegardenproject.github.io/stac-man/get-started/install#uninstall)): [Get Started → Install](https://bluegardenproject.github.io/stac-man/get-started/install).
 
 ## Quickstart
 

@@ -16,6 +16,18 @@ iwr -useb https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scri
 
 The installer downloads the latest release binary into `~/.stac-man/sm` (or `%USERPROFILE%\.stac-man\sm.exe` on Windows) and adds that directory to your shell's `PATH`. You may need to restart your shell or `source` your shell rc file the first time.
 
+::: details Which file does the installer touch?
+| Shell | File the installer writes to |
+|---|---|
+| zsh (incl. oh-my-zsh) | `${ZDOTDIR:-$HOME}/.zshrc` |
+| bash on Linux | `~/.bashrc` |
+| bash on macOS | `~/.bashrc`, plus `~/.bash_profile` if it already exists (login shells only read the latter) |
+| fish | `~/.config/fish/conf.d/stac-man.fish` (uses `fish_add_path`) |
+| anything else | `~/.profile` (with a warning to add `~/.stac-man` to `PATH` manually if your shell doesn't source it) |
+
+Each line is tagged with a `# stac-man (auto-added by install.sh)` marker and is idempotent: re-running the installer will not produce duplicates.
+:::
+
 ## Verify
 
 ```bash
@@ -51,6 +63,47 @@ sm update --check
 ```
 
 `sm update` shells out to the same install one-liner above. Dev builds (`Version == "dev"`) skip the network check and print a hint instead.
+
+## Uninstall
+
+`sm` lives in three places: the binary at `~/.stac-man/`, optional user config at `~/.config/stac-man/`, and per-repo stack metadata inside each repo's `.git/config`. The uninstaller cleans up the first two and leaves the third alone — that metadata is harmless without `sm` and is picked up again on reinstall.
+
+::: code-group
+
+```bash [Linux / macOS]
+curl -fsSL https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/uninstall.sh | bash
+```
+
+```bash [Linux / macOS — also remove config]
+curl -fsSL https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/uninstall.sh | bash -s -- --purge
+```
+
+```powershell [Windows]
+iwr -useb https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/uninstall.ps1 | iex
+```
+
+:::
+
+The script:
+
+1. Removes `~/.stac-man/` (binary).
+2. Strips the `# stac-man (auto-added by install.sh)` marker line and the following `export PATH=...` from `~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, and `~/.profile` if present. A hand-edited rc that doesn't have the marker is left alone, with a warning.
+3. Deletes `~/.config/fish/conf.d/stac-man.fish` (fish-only).
+4. Asks before removing `~/.config/stac-man/`. Pass `--purge` to skip the prompt, `--keep-config` to skip the step entirely. When piped from `curl` (no TTY) the default is to keep config.
+
+To undo it manually instead:
+
+```bash
+rm -rf ~/.stac-man ~/.config/stac-man
+# delete the line referencing ~/.stac-man from your shell rc
+```
+
+Per-repo metadata, if you want it gone, lives under `branch.*.stac-man-*` and `stac-man.trunk` in the local git config:
+
+```bash
+git config --local --get-regexp '^stac-man\.|^branch\.[^.]+\.stac-man-' | cut -d. -f1-2 | sort -u | \
+    xargs -n1 git config --local --remove-section
+```
 
 ## Build from source
 
