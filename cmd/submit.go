@@ -32,9 +32,16 @@ func init() {
 			"and accept the noisy diff.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
+			// Honor the user's prefer_draft_prs config when --draft
+			// wasn't explicitly passed. An explicit --draft=false on
+			// the CLI still wins because Changed() returns true.
+			effectiveDraft := draft
+			if !c.Flags().Changed("draft") && LoadedConfig().PreferDraftPRs {
+				effectiveDraft = true
+			}
 			r, err := newService().Submit(c.Context(), service.SubmitOptions{
 				Stack:        stack,
-				Draft:        draft,
+				Draft:        effectiveDraft,
 				Body:         body,
 				NoRestack:    noRestack,
 				NoStackTable: noStackTable,
@@ -45,7 +52,7 @@ func init() {
 		},
 	}
 	cmd.Flags().BoolVar(&stack, "stack", false, "submit every ancestor, the current branch, and every descendant (idempotent: branches already in sync with origin are not re-pushed)")
-	cmd.Flags().BoolVar(&draft, "draft", false, "create new PRs as drafts (existing PRs unchanged)")
+	cmd.Flags().BoolVar(&draft, "draft", false, "create new PRs as drafts (existing PRs unchanged); default flips to true when prefer_draft_prs is set in ~/.config/stac-man/config.yaml")
 	cmd.Flags().StringVar(&body, "body", "", "PR body for newly-created PRs")
 	cmd.Flags().BoolVar(&noRestack, "no-restack", false, "push branches even when their recorded parent SHA is stale (warn instead of skip)")
 	cmd.Flags().BoolVar(&noStackTable, "no-stack-table", false, "do not inject the auto-generated stack table into PR bodies")

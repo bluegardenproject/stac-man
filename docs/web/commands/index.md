@@ -59,6 +59,7 @@ Every `sm` subcommand, grouped by intent. For the canonical workflow see [Your f
 | [`sm track`](./track) | Adopt an existing branch into the stack graph. |
 | [`sm untrack`](./untrack) | Remove a branch from the stack graph. |
 | [`sm completion`](./completion) | Generate shell completion scripts. |
+| [`sm config`](./config) | Inspect or edit the optional user config (`~/.config/stac-man/config.yaml`). |
 | [`sm version`](./version) | Print version, build, and platform info. |
 | [`sm update`](./update) | Install the latest released version. |
 

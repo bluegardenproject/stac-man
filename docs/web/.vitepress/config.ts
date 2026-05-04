@@ -138,6 +138,7 @@ export default defineConfig({
             { text: 'sm track', link: '/commands/track' },
             { text: 'sm untrack', link: '/commands/untrack' },
             { text: 'sm completion', link: '/commands/completion' },
+            { text: 'sm config', link: '/commands/config' },
             { text: 'sm version', link: '/commands/version' },
             { text: 'sm update', link: '/commands/update' },
           ],
