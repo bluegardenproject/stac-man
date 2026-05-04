@@ -5,6 +5,9 @@ hero:
   name: stac-man
   text: Stacked PRs, locally.
   tagline: A small CLI for stacked pull requests. Free, local-only, no SaaS, no IDE plugin, no login.
+  image:
+    src: /stac-man-logo.png
+    alt: stac-man
   actions:
     - theme: brand
       text: Get Started
