@@ -2,7 +2,7 @@
 
 A small Go program that walks the `sm` cobra command tree and emits JSON.
 
-It's the programmatic source for the [docs-drift-audit](../../.cursor/skills/docs-drift-audit/SKILL.md) Cursor skill — given a JSON snapshot of the binary surface, the skill diffs it against `docs/site/commands/*.md` to catch missing pages, stale flags, and undocumented features.
+It's the programmatic source for the [docs-drift-audit](../../.cursor/skills/docs-drift-audit/SKILL.md) Cursor skill — given a JSON snapshot of the binary surface, the skill diffs it against `docs/web/commands/*.md` to catch missing pages, stale flags, and undocumented features.
 
 ## Run
 

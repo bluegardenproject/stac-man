@@ -59,6 +59,7 @@ export default defineConfig({
             { text: 'Restack', link: '/concepts/restack' },
             { text: 'Sync', link: '/concepts/sync' },
             { text: 'Parent metadata', link: '/concepts/parent-metadata' },
+            { text: 'Cockpit (TUI)', link: '/concepts/cockpit' },
           ],
         },
       ],
@@ -150,7 +151,7 @@ export default defineConfig({
     ],
 
     editLink: {
-      pattern: 'https://github.com/bluegardenproject/stac-man/edit/main/docs/site/:path',
+      pattern: 'https://github.com/bluegardenproject/stac-man/edit/main/docs/web/:path',
       text: 'Edit this page on GitHub',
     },
 

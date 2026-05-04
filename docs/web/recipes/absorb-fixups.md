@@ -4,7 +4,9 @@ You're three branches deep in a stack and you spot a typo (or a missed null-chec
 
 ## What you'd otherwise do
 
-```bash
+The manual flow is a three-step template (substitute `<sha-of-commit-4>` for the actual ancestor SHA you want the fixup to land on):
+
+```text
 git commit --fixup=<sha-of-commit-4>
 git rebase -i --autosquash main
 sm restack
@@ -31,11 +33,18 @@ End result: one command, no editor, descendants are consistent.
 
 ## Prerequisites
 
-Install `git-absorb`:
+Install `git-absorb` from one of the sources below.
+
+On macOS via Homebrew:
 
 ```bash
-brew install git-absorb              # macOS
-cargo install git-absorb              # any platform with rustup
+brew install git-absorb
+```
+
+On any platform with `rustup` / `cargo`:
+
+```bash
+cargo install git-absorb
 ```
 
 If `git-absorb` is missing, `sm absorb` prints an install hint and exits. It's not bundled with `sm`.

@@ -46,9 +46,16 @@ sm doctor
 
 `sm checkout` (no arg) opens a Bubble Tea picker on a TTY. If stdin or stdout is redirected, it falls back to printing the static tree.
 
+In an interactive terminal:
+
 ```bash
-sm checkout            # works in your terminal
-sm checkout | grep .   # falls back to static tree (intended)
+sm checkout
+```
+
+Piped (or any non-TTY context) it falls back to the static tree:
+
+```bash
+sm checkout | grep .
 ```
 
 Force the static tree explicitly:
@@ -59,12 +66,23 @@ sm log
 
 ## `sm submit` says "stack-mate diverged from origin"
 
-Someone (or you, on another machine) pushed over a branch in your stack. `sm submit` refuses to clobber. Recover by:
+Someone (or you, on another machine) pushed over a branch in your stack. `sm submit` refuses to clobber. Recover with one of two paths.
+
+First, refresh your view of origin:
 
 ```bash
 git fetch
-sm get <PR-of-the-diverged-branch>     # pull their version
-# or, if you're sure your local is right:
+```
+
+Then either pull their version of the branch (replace `<PR-of-the-diverged-branch>` with the PR number):
+
+```text
+sm get <PR-of-the-diverged-branch>
+```
+
+…or, if you're sure your local is right, force the local chain over origin and resubmit (replace `<branch>` with the branch name):
+
+```text
 git push --force-with-lease origin <branch>
 sm submit --stack
 ```
@@ -102,22 +120,35 @@ The local tree renders instantly.
 
 ## "git-absorb: command not found"
 
-`sm absorb` requires the upstream `git-absorb` binary. Install it:
+`sm absorb` requires the upstream `git-absorb` binary. Install it from one of the sources below.
+
+On macOS via Homebrew:
 
 ```bash
-brew install git-absorb              # macOS
-cargo install git-absorb              # other platforms
+brew install git-absorb
+```
+
+On any platform with `rustup` / `cargo`:
+
+```bash
+cargo install git-absorb
 ```
 
 Then re-run `sm absorb`.
 
 ## I deleted a branch with `git branch -D` and now `sm` is confused
 
-`sm`'s metadata still references it. Either re-create the branch (and re-track), or drop the metadata:
+`sm`'s metadata still references it. Either re-create the branch (and re-track), or drop the metadata.
 
-```bash
-sm untrack <name> --reparent      # if it had children you want to keep
-# or, if you don't care about children:
+If the deleted branch had children you want to keep stacked, reparent them first (replace `<name>` with the deleted branch name):
+
+```text
+sm untrack <name> --reparent
+```
+
+If you don't care about children, drop the git config section directly:
+
+```text
 git config --local --remove-section "branch.<name>"
 ```
 

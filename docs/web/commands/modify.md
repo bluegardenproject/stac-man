@@ -20,10 +20,9 @@ sm modify [-c] [--amend] [-a] [--include-untracked] [-m <msg>]
 
 ## Examples
 
-Default — amend in place and restack descendants:
+Default — amend in place and restack descendants. Make whatever edits you want in your editor first, then run:
 
 ```bash
-$EDITOR …
 sm modify -a
 ```
 

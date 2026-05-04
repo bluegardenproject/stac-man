@@ -1,0 +1,129 @@
+---
+description: Every bash/sh/zsh/fish/powershell code block in the docs must be copy-pasteable verbatim. No placeholders, no $EDITOR targets, no mixed alternatives.
+globs: docs/**/*.md,README.md
+alwaysApply: false
+---
+
+# Pasteable shell blocks in docs
+
+VitePress puts a copy button on every fenced code block. Anything fenced as `bash`, `sh`, `shell`, `zsh`, `fish`, or `powershell` is implicitly an invitation to paste — so it must run verbatim, exactly as written, in that shell.
+
+## The rule
+
+A `bash` (or sibling) block must satisfy ALL of:
+
+1. **Pasteable verbatim.** Every non-comment line is a real command the reader's shell can execute as-is.
+2. **No `<placeholder>` syntax** in any non-comment line. `<branch>`, `<sha>`, `<conflicted files>` are not commands; bash treats `<` as input redirection and will fail or do the wrong thing.
+3. **No `…` (ellipsis)** anywhere. Unicode `…` becomes a literal filename / argument.
+4. **No `$EDITOR`** as a command (e.g. `$EDITOR <files>`, `$EDITOR …`, `$EDITOR foo.go`). It either errors (unset `$EDITOR`) or hijacks the terminal (`vim` opens, blocking the queued commands).
+5. **One coherent operation per block.** Multiple commands are fine if pasting them all is the intended action (e.g. `make build && make test`, or a setup → action sequence). Two mutually-exclusive alternatives in one block are NOT — paste runs both.
+6. **Multi-shell snippets** (one snippet per shell) belong in a VitePress code group, not stuffed into a single `bash` block with `# zsh` / `# bash` separators.
+
+`#` comments inside a block are valid bash and may stay as inline annotations, provided every non-comment line still satisfies rules 1–5.
+
+## What to use instead
+
+| Situation | Use |
+|---|---|
+| Real, runnable command | <code>\`\`\`bash</code> (or `sh`, `zsh`, `fish`, `powershell` for shell-specific snippets) |
+| Template with `<placeholders>`, `…`, or `$EDITOR <file>` | <code>\`\`\`text</code> — keeps the copy button + monospace, drops the bash-syntax pretense |
+| Two or more mutually-exclusive alternatives | One block per alternative, with prose between explaining when to pick which |
+| Same command shown for multiple shells | `::: code-group` with one `bash`/`zsh`/`fish`/`powershell` block per tab |
+| Manual editor step inside a workflow | Split the workflow: command block, prose ("Edit `path/to/file`"), next command block |
+
+## Examples
+
+### BAD: mixes a manual edit with commands
+
+```bash
+sm create feat/auth-models
+$EDITOR internal/models/user.go
+sm modify -a -m "models: add User"
+```
+
+If the reader pastes this, `$EDITOR` opens (or errors), and the queued `sm modify` runs against whatever state the editor leaves on exit — usually wrong.
+
+### GOOD: split with prose for the manual step
+
+```bash
+sm create feat/auth-models
+```
+
+Edit the files for this branch (e.g. `internal/models/user.go`) in your editor, then commit:
+
+```bash
+sm modify -a -m "models: add User"
+```
+
+### BAD: placeholders in a `bash` block
+
+```bash
+$EDITOR <conflicted files>
+git add <resolved files>
+sm continue
+```
+
+### GOOD: prose for the placeholder steps, `bash` only for the runnable command
+
+1. Open the conflicted files in your editor and fix them.
+2. Stage what you fixed with `git add <files-you-fixed>` (or `git add -A`).
+3. Resume:
+
+```bash
+sm continue
+```
+
+### GOOD: template that's clearly not pasteable verbatim
+
+```text
+git commit --fixup=<sha-of-target-commit>
+git rebase -i --autosquash <base-branch>
+sm restack
+```
+
+### BAD: alternatives in one `bash` block
+
+```bash
+brew install git-absorb              # macOS
+cargo install git-absorb              # other platforms
+```
+
+### GOOD: split into one block per alternative
+
+On macOS via Homebrew:
+
+```bash
+brew install git-absorb
+```
+
+On any platform with `cargo`:
+
+```bash
+cargo install git-absorb
+```
+
+### GOOD: VitePress code group for shell variants
+
+```markdown
+::: code-group
+
+\`\`\`zsh [zsh]
+sm completion zsh > "${fpath[1]}/_sm"
+\`\`\`
+
+\`\`\`bash [bash]
+sm completion bash > /etc/bash_completion.d/sm
+\`\`\`
+
+:::
+```
+
+## Authoring checklist
+
+When you add or edit a fenced shell block in `docs/**/*.md` or `README.md`:
+
+- [ ] Could a reader paste this whole block into the named shell and get the intended outcome? If no, fix.
+- [ ] Does any line contain `<...>`, `…`, or `$EDITOR` followed by a target? If yes, move the placeholder to prose and switch the fence to `text`, or split the block.
+- [ ] If the block has two or more alternatives, are they split into separate blocks?
+- [ ] If the block is shell-specific, is the fence label correct (`zsh`/`fish`/`powershell` instead of `bash`)?
+- [ ] Multi-shell variants live in a `::: code-group`, not a single block with `# zsh` headers.

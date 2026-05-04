@@ -10,20 +10,28 @@ sm completion <bash|zsh|fish|powershell>
 
 ## Examples
 
-```bash
-# zsh — install once, then restart your shell
+Pick the tab for your shell. Each snippet is self-contained — pick one, paste, restart your shell.
+
+::: code-group
+
+```zsh [zsh]
 sm completion zsh > "${fpath[1]}/_sm"
+```
 
-# bash
+```bash [bash]
 sm completion bash > /etc/bash_completion.d/sm
+```
 
-# fish
+```fish [fish]
 sm completion fish > ~/.config/fish/completions/sm.fish
+```
 
-# powershell
+```powershell [powershell]
 sm completion powershell > sm.ps1
 . ./sm.ps1
 ```
+
+:::
 
 ## What it generates
 
@@ -35,13 +43,7 @@ A shell-specific script that wires:
 
 ## Verifying
 
-After installing, type:
-
-```bash
-sm checkout <TAB>
-```
-
-The list of tracked branches plus trunk should appear.
+After installing, type `sm checkout ` and press `<Tab>` — the list of tracked branches plus trunk should appear.
 
 ## See also
 

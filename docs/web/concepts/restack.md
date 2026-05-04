@@ -49,13 +49,15 @@ If a rebase hits a conflict, the engine pauses with a `PausedError`:
 
 What you do next:
 
+1. Open the conflicted files in your editor and fix them.
+2. Stage the resolved files with `git add <files-you-fixed>` (or `git add -A`).
+3. Pick up where the engine left off:
+
 ```bash
-$EDITOR <conflicted files>
-git add <resolved files>
-sm continue          # picks up where the engine left off
+sm continue
 ```
 
-`sm continue` runs `git rebase --continue` AND processes the rest of the queue. `sm abort` runs `git rebase --abort` AND clears the queue, restoring whatever branch you were on.
+`sm continue` runs `git rebase --continue` AND processes the rest of the queue. To bail out instead, run `sm abort` — it runs `git rebase --abort` AND clears the queue, restoring whatever branch you were on.
 
 ::: warning
 Don't run plain `git rebase --continue` here. The engine has more work queued after the current branch finishes; only `sm continue` knows about it.

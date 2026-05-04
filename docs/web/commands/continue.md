@@ -13,11 +13,13 @@ Neither takes flags or arguments.
 
 ## sm continue
 
-Resume the paused walk after you've resolved conflicts and staged the result.
+Resume the paused walk after you've resolved conflicts and staged the result. The flow is:
+
+1. Open and fix the conflicted files in your editor of choice.
+2. Stage what you resolved with `git add <files-you-fixed>` (or `git add -A`).
+3. Run the resume command:
 
 ```bash
-$EDITOR <conflicted files>
-git add <resolved files>
 sm continue
 ```
 
