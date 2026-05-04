@@ -1,8 +1,17 @@
-# stac-man
+<p align="center">
+  <img src="docs/web/public/stac-man-logo.png" alt="stac-man" width="180" />
+</p>
+
+<h1 align="center">stac-man</h1>
+
+<p align="center">
+  <a href="https://bluegardenproject.github.io/stac-man/"><strong>Documentation</strong></a> ·
+  <a href="https://bluegardenproject.github.io/stac-man/get-started/install"><strong>Install</strong></a> ·
+  <a href="https://bluegardenproject.github.io/stac-man/get-started/first-stack"><strong>First stack</strong></a> ·
+  <a href="https://github.com/bluegardenproject/stac-man/releases">Releases</a>
+</p>
 
 `sm` — a CLI for stacked pull requests. Free, local-only, no IDE plugin, no SaaS, no login. Stack metadata lives in your local git config; pull-request operations are delegated to the [GitHub CLI (`gh`)](https://cli.github.com/).
-
-📚 **Documentation: [bluegardenproject.github.io/stac-man](https://bluegardenproject.github.io/stac-man/)**
 
 ## Install
 

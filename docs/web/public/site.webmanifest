@@ -1,0 +1,22 @@
+{
+  "name": "stac-man",
+  "short_name": "stac-man",
+  "description": "A CLI for stacked pull requests. Free, local-only, no SaaS.",
+  "icons": [
+    {
+      "src": "/stac-man/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/stac-man/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#FF10F0",
+  "background_color": "#120018",
+  "display": "standalone",
+  "start_url": "/stac-man/",
+  "scope": "/stac-man/"
+}
