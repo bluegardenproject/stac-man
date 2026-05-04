@@ -428,6 +428,64 @@ func (c *Client) LogBetween(ctx context.Context, base, head string) ([]Commit, e
 	return commits, nil
 }
 
+// ConflictPaths lists the files in the index with unresolved merge
+// conflicts (`git diff --name-only --diff-filter=U`). Returns an
+// empty slice when nothing is conflicted; the caller can use this
+// to render the cockpit's conflict resolver without re-implementing
+// the index probe.
+//
+// Empty stdout is the common "no conflicts" case and is not an error.
+func (c *Client) ConflictPaths(ctx context.Context) ([]string, error) {
+	out, _, err := c.r.Run(ctx, "diff", "--name-only", "--diff-filter=U")
+	if err != nil {
+		return nil, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return []string{}, nil
+	}
+	lines := strings.Split(out, "\n")
+	paths := make([]string, 0, len(lines))
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			paths = append(paths, l)
+		}
+	}
+	return paths, nil
+}
+
+// Diff returns the unified diff covering everything in head that is
+// not in base, as `git diff --no-color base..head` would print it.
+// The output is returned verbatim (no trim) because diff content is
+// position-sensitive — leading/trailing whitespace inside hunks
+// matters. An empty string is the legitimate "no changes" answer
+// and is not an error.
+//
+// --no-color is set explicitly so the cockpit's diff viewer always
+// receives plain text it can re-style itself, regardless of how the
+// user's `color.diff` config is set.
+func (c *Client) Diff(ctx context.Context, base, head string) (string, error) {
+	out, _, err := c.r.Run(ctx, "diff", "--no-color", base+".."+head)
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+// Show returns the output of `git show --no-color <ref>`: the commit
+// metadata header (author, date, message) followed by its unified
+// diff against the parent. Used by the cockpit's diff viewer to
+// render one screen per commit. As with Diff the output is returned
+// verbatim so hunk whitespace is preserved.
+func (c *Client) Show(ctx context.Context, ref string) (string, error) {
+	out, _, err := c.r.Run(ctx, "show", "--no-color", ref)
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
 // CherryPick applies one commit on top of HEAD.
 func (c *Client) CherryPick(ctx context.Context, sha string) error {
 	_, _, err := c.r.Run(ctx, "cherry-pick", sha)

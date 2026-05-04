@@ -1,8 +1,17 @@
-# stac-man
+<p align="center">
+  <img src="docs/web/public/stac-man-logo.png" alt="stac-man" width="180" />
+</p>
+
+<h1 align="center">stac-man</h1>
+
+<p align="center">
+  <a href="https://bluegardenproject.github.io/stac-man/"><strong>Documentation</strong></a> ·
+  <a href="https://bluegardenproject.github.io/stac-man/get-started/install"><strong>Install</strong></a> ·
+  <a href="https://bluegardenproject.github.io/stac-man/get-started/first-stack"><strong>First stack</strong></a> ·
+  <a href="https://github.com/bluegardenproject/stac-man/releases">Releases</a>
+</p>
 
 `sm` — a CLI for stacked pull requests. Free, local-only, no IDE plugin, no SaaS, no login. Stack metadata lives in your local git config; pull-request operations are delegated to the [GitHub CLI (`gh`)](https://cli.github.com/).
-
-📚 **Documentation: [bluegardenproject.github.io/stac-man](https://bluegardenproject.github.io/stac-man/)**
 
 ## Install
 
@@ -18,25 +27,48 @@ curl -fsSL https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scr
 iwr -useb https://raw.githubusercontent.com/bluegardenproject/stac-man/main/scripts/install.ps1 | iex
 ```
 
-Verify with `sm --version`. Full install notes: [Get Started → Install](https://bluegardenproject.github.io/stac-man/get-started/install).
+Verify with `sm --version`. Full install notes (including [uninstall](https://bluegardenproject.github.io/stac-man/get-started/install#uninstall)): [Get Started → Install](https://bluegardenproject.github.io/stac-man/get-started/install).
 
 ## Quickstart
 
+Start a feature stack from trunk:
+
 ```bash
 git switch main
-sm create feat/auth-models           # branches off main, parent=main
-$EDITOR …
-sm modify -a -m "models: add User"   # commit + auto-restack descendants
+sm create feat/auth-models
+```
 
-sm create feat/auth-handlers         # stacks on feat/auth-models
-$EDITOR …
+Edit your files, then commit (auto-restacks descendants):
+
+```bash
+sm modify -a -m "models: add User"
+```
+
+Stack a second branch on top of the first, edit, commit:
+
+```bash
+sm create feat/auth-handlers
+```
+
+```bash
 sm modify -a -m "handlers: /login"
+```
 
-sm log                               # see the tree
-sm submit --stack                    # push + open PRs with bases wired
+Inspect the tree, then push the whole stack as PRs with bases wired:
+
+```bash
+sm log
+```
+
+```bash
+sm submit --stack
 ```
 
 That's the whole loop. Walk through it end-to-end at [Your first stack](https://bluegardenproject.github.io/stac-man/get-started/first-stack).
+
+## Interactive cockpit
+
+Run `sm` with no arguments in a terminal and you land in the **cockpit** — a Bubble Tea TUI over the same service layer the CLI uses. One screen for the whole stack, single-key actions for every common verb (`enter` checkout, `r` restack, `m` modify, `s` submit, `d` diff, `?` help, `ctrl+p` command palette), an in-TUI conflict resolver for paused rebases, and a per-commit diff viewer. Pipes, CI, and any other non-TTY context still get `sm --help`, so existing scripts are unaffected. Full tour: [Concepts → Cockpit](https://bluegardenproject.github.io/stac-man/concepts/cockpit).
 
 ## Documentation
 
@@ -61,7 +93,7 @@ make build            # → ./sm
 make test             # go test ./...
 ```
 
-Commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/). The `commit-msg` hook in [`.githooks/`](.githooks/) enforces this locally; CI does the same.
+Commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) and Go files must pass `gofmt`. Both rules are enforced locally by the hooks in [`.githooks/`](.githooks/) (wired up by `make setup`) and re-checked in CI.
 
 Releases are driven by [Release Please](https://github.com/googleapis/release-please) on `main`. See the [release-please workflow](.github/workflows/release-please.yml) for the cross-compile matrix.
 

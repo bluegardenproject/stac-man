@@ -1,0 +1,273 @@
+/*
+ * stac-man docs theme.
+ *
+ * Two palettes coexist here:
+ *
+ *   1. --sm-*    — the neon synthwave palette mirrored from
+ *                  internal/ui/theme/palette.json. Shared with the Go
+ *                  TUI; do NOT diverge from palette.json.
+ *
+ *   2. --logo-*  — the docs-only palette sampled from the
+ *                  stac-man-logo.png artwork (sunset gradient + sky
+ *                  blue text gradient + navy background). VitePress
+ *                  brand and surface variables are bound to these so
+ *                  the website mirrors the logo's color story
+ *                  without disturbing the TUI palette.
+ *
+ * If you tweak --logo-* values, consider rotating the og-image and
+ * favicon set so cross-platform branding stays consistent.
+ */
+
+:root {
+  /* --- 1. TUI-shared palette (do not edit; mirrors palette.json) --- */
+  --sm-neon-pink: #FF10F0;
+  --sm-neon-cyan: #00F0FF;
+  --sm-neon-magenta: #FF00FF;
+  --sm-neon-lime: #39FF14;
+  --sm-neon-purple: #BF00FF;
+  --sm-neon-orange: #FF6A00;
+  --sm-neon-yellow: #F5FF00;
+  --sm-neon-blue: #1B03FF;
+  --sm-hot-pink: #FF2A6D;
+  --sm-dark-bg: #120018;
+  --sm-dim: #6C6C80;
+
+  /* --- 2. Logo-derived palette (docs only) ---
+     Sampled from docs/web/public/stac-man-logo.png. Each token names
+     the role it plays in the artwork so site-CSS reads naturally. */
+
+  /* Warm half — sun + Pac-Man + stack chunks */
+  --logo-yellow: #FFD23F;
+  --logo-gold: #FFA42B;
+  --logo-orange: #FF6A3D;
+  --logo-coral: #FF3D7F;
+  --logo-pink: #FF1493;
+  --logo-magenta: #E5008C;
+  --logo-purple: #7B2FBE;
+
+  /* Cool half — STAC-MAN text + sky */
+  --logo-cyan: #3FD7FF;
+  --logo-blue: #5B9BFF;
+  --logo-navy: #0E1238;
+  --logo-night: #070A22;
+
+  /* Deeper / lighter shifts for AA contrast on cream surfaces. */
+  --logo-magenta-deep: #B5006E;
+  --logo-purple-deep: #5B1F94;
+  --logo-orange-deep: #C9421A;
+  --logo-blue-deep: #2D5BC8;
+
+  /* --- VitePress bindings — light mode --- */
+  --vp-c-brand-1: var(--logo-magenta-deep);   /* primary text/links */
+  --vp-c-brand-2: var(--logo-pink);           /* hover */
+  --vp-c-brand-3: var(--logo-orange);         /* active / sun */
+  --vp-c-brand-soft: rgba(229, 0, 140, 0.12);
+
+  /* Surfaces — warm peach-cream so the sunset palette feels at home. */
+  --vp-c-bg: #FFF6EC;
+  --vp-c-bg-alt: #FCEFE0;
+  --vp-c-bg-soft: #F7E6D2;
+  --vp-c-bg-elv: #FFFFFF;
+
+  --vp-c-divider: rgba(123, 47, 190, 0.16);
+  --vp-c-gutter: #F0E0CB;
+
+  /* Text — navy from the logo gives the strongest tie-in. */
+  --vp-c-text-1: var(--logo-navy);
+  --vp-c-text-2: #3B3A6A;
+  --vp-c-text-3: #6E6D90;
+
+  --vp-code-color: var(--logo-navy);
+  --vp-code-bg: #F7E6D2;
+  --vp-code-block-bg: #FCEFE0;
+  --vp-code-line-highlight-color: rgba(255, 20, 147, 0.10);
+
+  --vp-button-brand-bg: var(--logo-magenta-deep);
+  --vp-button-brand-hover-bg: var(--logo-pink);
+  --vp-button-brand-active-bg: var(--logo-orange);
+  --vp-button-brand-text: #FFF6EC;
+  --vp-button-brand-hover-text: #FFFFFF;
+  --vp-button-brand-active-text: #FFFFFF;
+
+  --vp-button-alt-bg: #FCEFE0;
+  --vp-button-alt-hover-bg: #F7E6D2;
+  --vp-button-alt-active-bg: #F0E0CB;
+  --vp-button-alt-text: var(--logo-navy);
+  --vp-button-alt-hover-text: var(--logo-magenta-deep);
+  --vp-button-alt-active-text: var(--logo-magenta-deep);
+
+  /* Custom blocks — info uses sky blue, tip uses cyan, warning uses
+     gold, danger uses coral. Each role gets its own logo hue. */
+  --vp-custom-block-info-border: var(--logo-blue-deep);
+  --vp-custom-block-info-text: var(--logo-blue-deep);
+  --vp-custom-block-info-bg: rgba(91, 155, 255, 0.10);
+  --vp-custom-block-tip-border: var(--logo-cyan);
+  --vp-custom-block-tip-text: #0F7A99;
+  --vp-custom-block-tip-bg: rgba(63, 215, 255, 0.12);
+  --vp-custom-block-warning-border: var(--logo-gold);
+  --vp-custom-block-warning-text: #8A4A00;
+  --vp-custom-block-warning-bg: rgba(255, 164, 43, 0.14);
+  --vp-custom-block-danger-border: var(--logo-coral);
+  --vp-custom-block-danger-text: #B30041;
+  --vp-custom-block-danger-bg: rgba(255, 61, 127, 0.10);
+
+  /* Home hero — sunset gradient, fading from yellow through pink to
+     purple, exactly like the logo's sun-and-sky band. */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    100deg,
+    var(--logo-orange) 0%,
+    var(--logo-pink) 45%,
+    var(--logo-purple) 100%
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    160deg,
+    var(--logo-yellow) 0%,
+    var(--logo-orange) 30%,
+    var(--logo-pink) 55%,
+    var(--logo-purple) 85%
+  );
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+/*
+ * Dark mode — logo's navy sky as the surface, full-saturation logo
+ * accents, sunset-into-night gradient on the hero.
+ */
+.dark {
+  --vp-c-brand-1: var(--logo-pink);
+  --vp-c-brand-2: var(--logo-cyan);
+  --vp-c-brand-3: var(--logo-orange);
+  --vp-c-brand-soft: rgba(255, 20, 147, 0.18);
+
+  --vp-c-bg: var(--logo-navy);
+  --vp-c-bg-alt: var(--logo-night);
+  --vp-c-bg-soft: #14184A;
+  --vp-c-bg-elv: #1B205C;
+
+  --vp-c-divider: rgba(255, 20, 147, 0.20);
+  --vp-c-gutter: #050818;
+
+  --vp-c-text-1: #F5F0E0;
+  --vp-c-text-2: #C8C2D9;
+  --vp-c-text-3: #8A88A8;
+
+  --vp-code-color: #F5F0E0;
+  --vp-code-bg: #14184A;
+  --vp-code-block-bg: #070A22;
+  --vp-code-line-highlight-color: rgba(63, 215, 255, 0.10);
+
+  --vp-button-brand-bg: var(--logo-pink);
+  --vp-button-brand-hover-bg: var(--logo-coral);
+  --vp-button-brand-active-bg: var(--logo-orange);
+  --vp-button-brand-text: var(--logo-night);
+  --vp-button-brand-hover-text: var(--logo-night);
+  --vp-button-brand-active-text: #FFFFFF;
+
+  --vp-button-alt-bg: #1B205C;
+  --vp-button-alt-hover-bg: #242A6E;
+  --vp-button-alt-active-bg: #2D3580;
+  --vp-button-alt-text: #F5F0E0;
+  --vp-button-alt-hover-text: var(--logo-cyan);
+  --vp-button-alt-active-text: var(--logo-cyan);
+
+  --vp-custom-block-info-border: var(--logo-blue);
+  --vp-custom-block-info-text: var(--logo-blue);
+  --vp-custom-block-info-bg: rgba(91, 155, 255, 0.10);
+  --vp-custom-block-tip-border: var(--logo-cyan);
+  --vp-custom-block-tip-text: var(--logo-cyan);
+  --vp-custom-block-tip-bg: rgba(63, 215, 255, 0.10);
+  --vp-custom-block-warning-border: var(--logo-yellow);
+  --vp-custom-block-warning-text: var(--logo-yellow);
+  --vp-custom-block-warning-bg: rgba(255, 210, 63, 0.10);
+  --vp-custom-block-danger-border: var(--logo-coral);
+  --vp-custom-block-danger-text: var(--logo-coral);
+  --vp-custom-block-danger-bg: rgba(255, 61, 127, 0.12);
+
+  --vp-home-hero-name-background: linear-gradient(
+    100deg,
+    var(--logo-yellow) 0%,
+    var(--logo-orange) 25%,
+    var(--logo-pink) 55%,
+    var(--logo-cyan) 100%
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    160deg,
+    var(--logo-orange) 0%,
+    var(--logo-pink) 30%,
+    var(--logo-purple) 60%,
+    var(--logo-cyan) 100%
+  );
+  --vp-home-hero-image-filter: blur(72px);
+}
+
+/* Inline code: subtle brand tint so it stands out without pulling
+   focus from prose. */
+:not(pre) > code {
+  color: var(--vp-c-brand-1);
+  background-color: var(--vp-c-brand-soft);
+  border-radius: 4px;
+  padding: 0.125em 0.4em;
+  font-weight: 500;
+}
+
+/* Document headings — h1 carries the sunset gradient on light mode
+   and a sunset-into-cyan sweep on dark, mimicking the logo's two
+   biggest color moves (sun + STAC-MAN text). */
+.vp-doc h1 {
+  background: linear-gradient(
+    100deg,
+    var(--logo-orange),
+    var(--logo-pink),
+    var(--logo-purple)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+.dark .vp-doc h1 {
+  background: linear-gradient(
+    100deg,
+    var(--logo-orange),
+    var(--logo-pink),
+    var(--logo-cyan)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* h2 picks up brand-1 so the section rhythm reads visually. */
+.vp-doc h2 {
+  color: var(--vp-c-brand-1);
+}
+
+/* Tables: brand header text. */
+.vp-doc table {
+  border-collapse: collapse;
+}
+.vp-doc th {
+  color: var(--vp-c-brand-1);
+}
+
+/* Sidebar active item: brand color. */
+.VPSidebarItem.is-active > .item .text {
+  color: var(--vp-c-brand-1) !important;
+}
+
+/* Search box: brand outline on focus / hover. */
+.DocSearch-Button:hover,
+.DocSearch-Form {
+  border-color: var(--vp-c-brand-1) !important;
+}
+
+/* Nav-bar logo gets a subtle sunset glow on hover so the brand
+   element feels alive without jumping around. */
+.VPNavBarTitle .logo {
+  filter: drop-shadow(0 0 0 transparent);
+  transition: filter 200ms ease;
+}
+.VPNavBarTitle:hover .logo {
+  filter: drop-shadow(0 0 6px rgba(255, 20, 147, 0.45));
+}

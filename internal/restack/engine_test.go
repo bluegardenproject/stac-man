@@ -21,6 +21,12 @@ type fakeGit struct {
 	// first time `branch` matches that name.
 	conflictOn string
 
+	// conflictPaths is what ConflictPaths returns; nil → empty.
+	// conflictPathsErr, when set, overrides conflictPaths and is
+	// surfaced as a hard failure (used by Paused-error tests).
+	conflictPaths    []string
+	conflictPathsErr error
+
 	rebases    []rebaseCall
 	checkouts  []string
 	continued  int
@@ -51,6 +57,16 @@ func (f *fakeGit) RevParse(_ context.Context, ref string) (string, error) {
 		return sha, nil
 	}
 	return "", errors.New("unknown ref " + ref)
+}
+
+func (f *fakeGit) ConflictPaths(_ context.Context) ([]string, error) {
+	if f.conflictPathsErr != nil {
+		return nil, f.conflictPathsErr
+	}
+	if f.conflictPaths == nil {
+		return []string{}, nil
+	}
+	return append([]string(nil), f.conflictPaths...), nil
 }
 
 func (f *fakeGit) Rebase(_ context.Context, onto, upstream, branch string) error {
