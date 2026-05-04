@@ -64,6 +64,21 @@ sm update --check
 
 `sm update` shells out to the same install one-liner above. Dev builds (`Version == "dev"`) skip the network check and print a hint instead.
 
+::: details How will I know there's an update?
+`sm` checks the GitHub releases API in the background **at most once every 24 hours** and caches the latest tag in `~/.cache/stac-man/last-update-check.json`. When the running binary is older than the cached tag, every command prints a single dim line on `stderr` after it finishes:
+
+```
+↑ stac-man v0.3.0 is available (you're on v0.2.1). Run `sm update` to install.
+```
+
+The check is non-blocking — it never delays a command. The hint is suppressed when:
+
+- stdout is not a TTY (so pipes and CI logs stay clean),
+- the running binary is a dev build (no tagged release to compare against),
+- the env var `NO_UPDATE_NOTIFIER` is set (standard opt-out, mirrors `npm`/`gh`),
+- you're running `sm update`, `sm version`, `sm completion`, or `sm help` (those commands handle their own version output).
+:::
+
 ## Uninstall
 
 `sm` lives in three places: the binary at `~/.stac-man/`, optional user config at `~/.config/stac-man/`, and per-repo stack metadata inside each repo's `.git/config`. The uninstaller cleans up the first two and leaves the third alone — that metadata is harmless without `sm` and is picked up again on reinstall.

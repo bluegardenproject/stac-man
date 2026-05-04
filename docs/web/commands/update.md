@@ -38,6 +38,16 @@ sm update
 2. Compares against the embedded `Version` of the running binary.
 3. If newer, runs the platform-appropriate install script (curl on Linux/macOS, iwr on Windows). Otherwise prints "You're already on the latest version."
 
+## Background update notification
+
+You don't have to remember to run `sm update --check`. `sm` queries the GitHub releases API in the background at most once every 24 hours and caches the result in `~/.cache/stac-man/last-update-check.json` (or `$XDG_CACHE_HOME/stac-man/...` if set). When the running binary is older than the cached tag, every command prints a single dim line on `stderr` after it finishes:
+
+```
+↑ stac-man v0.3.0 is available (you're on v0.2.1). Run `sm update` to install.
+```
+
+The check is non-blocking. To opt out entirely, set `NO_UPDATE_NOTIFIER=1` in your shell. The notification is automatically suppressed for `sm update`, `sm version`, `sm completion`, `sm help`, dev builds, and non-TTY stdout.
+
 ## Dev builds
 
 Builds with `Version == "dev"` (from `make build` rather than a tagged release) skip the network check and print a hint to install a release first:
