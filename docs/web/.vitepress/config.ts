@@ -19,15 +19,28 @@ export default defineConfig({
     },
   },
 
+  // Asset paths in `head` need the configured base prefix because
+  // VitePress emits them verbatim into <link>/<meta>. Asset paths in
+  // `themeConfig` (logo, etc.) are resolved relative to base for us,
+  // so they must NOT include the prefix.
   head: [
+    ['link', { rel: 'icon', type: 'image/x-icon', href: '/stac-man/favicon.ico' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/stac-man/favicon-32x32.png' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/stac-man/favicon-16x16.png' }],
+    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/stac-man/apple-touch-icon.png' }],
+    ['link', { rel: 'manifest', href: '/stac-man/site.webmanifest' }],
     ['meta', { name: 'theme-color', content: '#FF10F0' }],
     ['meta', { property: 'og:title', content: 'stac-man — stacked PRs, locally' }],
     ['meta', { property: 'og:description', content: 'A CLI for stacked pull requests. Free, local-only, no SaaS, no IDE plugin.' }],
     ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:image', content: 'https://bluegardenproject.github.io/stac-man/stac-man-logo.png' }],
+    ['meta', { name: 'twitter:card', content: 'summary' }],
+    ['meta', { name: 'twitter:image', content: 'https://bluegardenproject.github.io/stac-man/stac-man-logo.png' }],
   ],
 
   themeConfig: {
     siteTitle: 'stac-man',
+    logo: '/stac-man-logo.png',
 
     nav: [
       { text: 'Get Started', link: '/get-started/install' },
