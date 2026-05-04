@@ -10,6 +10,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/bluegardenproject/stac-man/internal/tui/cockpit"
 	"github.com/spf13/cobra"
 )
 
@@ -61,6 +62,17 @@ func newRootCmd() *cobra.Command {
 		Version:       Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// BREAKING (v1.0.0): bare `sm` on a TTY now opens the
+		// interactive cockpit instead of printing help. Pipes, CI,
+		// or any non-TTY context still get help so existing
+		// scripts are unaffected.
+		Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			if !stdinIsTTY() || !stdoutIsTTY() {
+				return c.Help()
+			}
+			return cockpit.Run(c.Context(), newService())
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if flagNoColor {
 				_ = os.Setenv("NO_COLOR", "1")

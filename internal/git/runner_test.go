@@ -347,6 +347,155 @@ func TestRebaseArgs(t *testing.T) {
 	}
 }
 
+// TestConflictPathsNoneIsEmptySlice locks the contract the cockpit's
+// resolver relies on: a clean index returns an empty slice (not nil
+// + a "no conflicts" error). The caller can then render
+// "no conflicts" without distinguishing between absence and failure.
+func TestConflictPathsNoneIsEmptySlice(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"diff --name-only --diff-filter=U": {stdout: ""},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.ConflictPaths(context.Background())
+	if err != nil {
+		t.Fatalf("ConflictPaths: %v", err)
+	}
+	if got == nil {
+		t.Fatalf("ConflictPaths returned nil, want empty slice (cockpit treats nil as failure)")
+	}
+	if len(got) != 0 {
+		t.Fatalf("ConflictPaths = %v, want empty", got)
+	}
+}
+
+// TestConflictPathsParsesMultipleLines pins the parser: one path per
+// line, blank lines skipped, surrounding whitespace stripped — so a
+// terminal trailing newline (which `git diff` always emits) does
+// not produce a phantom empty entry.
+func TestConflictPathsParsesMultipleLines(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"diff --name-only --diff-filter=U": {stdout: "internal/foo.go\ninternal/bar.go\n"},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.ConflictPaths(context.Background())
+	if err != nil {
+		t.Fatalf("ConflictPaths: %v", err)
+	}
+	want := []string{"internal/foo.go", "internal/bar.go"}
+	if !equalSlices(got, want) {
+		t.Fatalf("ConflictPaths = %v, want %v", got, want)
+	}
+}
+
+// TestConflictPathsSurfacesGitErrors guarantees a real git failure
+// (missing repo, broken index) bubbles up rather than collapsing to
+// "no conflicts" — silent collapse here would hide a stuck restack
+// from the resolver UI.
+func TestConflictPathsSurfacesGitErrors(t *testing.T) {
+	r := &fakeRunner{fallback: fakeResponse{err: exitErr(128)}}
+	c := NewWithRunner(r)
+	if _, err := c.ConflictPaths(context.Background()); err == nil {
+		t.Fatalf("ConflictPaths returned nil error, want propagation of git failure")
+	}
+}
+
+// TestDiffArgsAndPassthrough pins two contracts the cockpit's diff
+// viewer relies on: the exact argv (range syntax + --no-color) and
+// the fact that the body is returned verbatim. Hunk whitespace is
+// position-sensitive, so even a single TrimSpace would silently
+// corrupt blank-line context lines.
+func TestDiffArgsAndPassthrough(t *testing.T) {
+	body := "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,1 +1,1 @@\n-old\n+new\n"
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"diff --no-color main..feat-a": {stdout: body},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.Diff(context.Background(), "main", "feat-a")
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
+	if got != body {
+		t.Fatalf("Diff body got %q, want %q (verbatim passthrough required)", got, body)
+	}
+	if len(r.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(r.calls))
+	}
+	want := []string{"diff", "--no-color", "main..feat-a"}
+	if !equalSlices(r.calls[0], want) {
+		t.Fatalf("argv = %v, want %v", r.calls[0], want)
+	}
+}
+
+// TestDiffEmptyIsNotAnError covers the "branches at the same commit"
+// case: git exits 0 with empty stdout and the helper should report
+// that as a clean empty result rather than a failure.
+func TestDiffEmptyIsNotAnError(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"diff --no-color main..feat-a": {stdout: ""},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.Diff(context.Background(), "main", "feat-a")
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("Diff = %q, want empty", got)
+	}
+}
+
+// TestDiffSurfaceErrorsFromGit guarantees the helper does not swallow
+// genuine failures (bad ref, repo missing, etc.). Without this, the
+// cockpit could silently render an empty diff for an invalid range.
+func TestDiffSurfaceErrorsFromGit(t *testing.T) {
+	r := &fakeRunner{fallback: fakeResponse{err: exitErr(128)}}
+	c := NewWithRunner(r)
+	if _, err := c.Diff(context.Background(), "main", "no-such-branch"); err == nil {
+		t.Fatalf("Diff returned nil error, want propagation of git failure")
+	}
+}
+
+// TestShowArgsAndPassthrough pins the per-commit viewer contract:
+// `git show --no-color <ref>` and the body returned verbatim so the
+// commit metadata header (author, date, message) survives intact.
+func TestShowArgsAndPassthrough(t *testing.T) {
+	body := "commit deadbeef\nAuthor: Foo <foo@bar>\nDate: now\n\n    subject\n\n    body\n\ndiff --git a/x b/x\n"
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"show --no-color deadbeef": {stdout: body},
+		},
+	}
+	c := NewWithRunner(r)
+	got, err := c.Show(context.Background(), "deadbeef")
+	if err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	if got != body {
+		t.Fatalf("Show body got %q, want %q (verbatim passthrough required)", got, body)
+	}
+	want := []string{"show", "--no-color", "deadbeef"}
+	if !equalSlices(r.calls[0], want) {
+		t.Fatalf("argv = %v, want %v", r.calls[0], want)
+	}
+}
+
+// TestShowSurfaceErrorsFromGit mirrors the Diff equivalent: an
+// invalid ref must propagate so the cockpit can show a real error.
+func TestShowSurfaceErrorsFromGit(t *testing.T) {
+	r := &fakeRunner{fallback: fakeResponse{err: exitErr(128)}}
+	c := NewWithRunner(r)
+	if _, err := c.Show(context.Background(), "no-such-sha"); err == nil {
+		t.Fatalf("Show returned nil error, want propagation of git failure")
+	}
+}
+
 func equalSlices(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
