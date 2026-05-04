@@ -21,6 +21,8 @@ features:
     details: Stack relationships live in `.git/config`. No service to log into, no project to create. Drop the binary on your PATH and start stacking.
   - title: Stack-aware git verbs
     details: '`sm create`, `sm modify`, `sm restack`, `sm sync` — every mutating command rewrites descendants for you so the chain stays consistent.'
+  - title: Interactive cockpit
+    details: 'Bare `sm` on a TTY opens a Bubble Tea TUI: dashboard, conflict resolver, diff viewer, and a fuzzy command palette over every common verb.'
   - title: PRs through gh
     details: '`sm submit --stack` pushes every branch and opens or retargets PRs through the GitHub CLI. No tokens stored, no extra auth.'
   - title: Recover, undo, doctor
@@ -33,18 +35,37 @@ Stacked pull requests — small, dependent branches that each become their own P
 
 ## In 30 seconds
 
+Start a feature stack from trunk:
+
 ```bash
 git switch main
-sm create feat/auth-models           # branches off main
-$EDITOR …
-sm modify -a -m "models: add User"   # commit + auto-restack descendants
+sm create feat/auth-models
+```
 
-sm create feat/auth-handlers         # stacks on feat/auth-models
-$EDITOR …
+Edit your files, then commit (auto-restacks descendants):
+
+```bash
+sm modify -a -m "models: add User"
+```
+
+Stack a second branch on top of the first, edit, commit:
+
+```bash
+sm create feat/auth-handlers
+```
+
+```bash
 sm modify -a -m "handlers: /login"
+```
 
-sm log                               # see the tree
-sm submit --stack                    # push + open PRs with bases wired
+Inspect the tree, then push the whole stack as PRs with bases wired:
+
+```bash
+sm log
+```
+
+```bash
+sm submit --stack
 ```
 
 That's the whole loop. From here:

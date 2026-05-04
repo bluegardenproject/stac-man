@@ -1,6 +1,6 @@
 // docscan dumps the stac-man cobra command tree as JSON. It's the
 // programmatic source for the docs-drift-audit Cursor skill, which
-// cross-checks the binary surface against the docs/site/ pages.
+// cross-checks the binary surface against the docs/web/ pages.
 //
 // Usage:
 //

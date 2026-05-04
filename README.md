@@ -22,21 +22,44 @@ Verify with `sm --version`. Full install notes: [Get Started → Install](https:
 
 ## Quickstart
 
+Start a feature stack from trunk:
+
 ```bash
 git switch main
-sm create feat/auth-models           # branches off main, parent=main
-$EDITOR …
-sm modify -a -m "models: add User"   # commit + auto-restack descendants
+sm create feat/auth-models
+```
 
-sm create feat/auth-handlers         # stacks on feat/auth-models
-$EDITOR …
+Edit your files, then commit (auto-restacks descendants):
+
+```bash
+sm modify -a -m "models: add User"
+```
+
+Stack a second branch on top of the first, edit, commit:
+
+```bash
+sm create feat/auth-handlers
+```
+
+```bash
 sm modify -a -m "handlers: /login"
+```
 
-sm log                               # see the tree
-sm submit --stack                    # push + open PRs with bases wired
+Inspect the tree, then push the whole stack as PRs with bases wired:
+
+```bash
+sm log
+```
+
+```bash
+sm submit --stack
 ```
 
 That's the whole loop. Walk through it end-to-end at [Your first stack](https://bluegardenproject.github.io/stac-man/get-started/first-stack).
+
+## Interactive cockpit
+
+Run `sm` with no arguments in a terminal and you land in the **cockpit** — a Bubble Tea TUI over the same service layer the CLI uses. One screen for the whole stack, single-key actions for every common verb (`enter` checkout, `r` restack, `m` modify, `s` submit, `d` diff, `?` help, `ctrl+p` command palette), an in-TUI conflict resolver for paused rebases, and a per-commit diff viewer. Pipes, CI, and any other non-TTY context still get `sm --help`, so existing scripts are unaffected. Full tour: [Concepts → Cockpit](https://bluegardenproject.github.io/stac-man/concepts/cockpit).
 
 ## Documentation
 

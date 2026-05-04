@@ -16,9 +16,11 @@ You see:
 
 ### To resolve and continue
 
+1. Open the conflicted files in your editor and fix them.
+2. Stage the resolved files with `git add <files-you-fixed>` (or `git add -A`).
+3. Resume the engine:
+
 ```bash
-$EDITOR <conflicted files>
-git add <resolved files>
 sm continue
 ```
 
@@ -79,16 +81,28 @@ sm undo
 
 ### Step 4 — last resort: manual git
 
-If `sm undo` can't get you back (e.g. the bad op happened more than 50 ops ago), git's reflog still has the SHAs:
+If `sm undo` can't get you back (e.g. the bad op happened more than 50 ops ago), git's reflog still has the SHAs.
+
+Inspect the reflog for the branch you want to restore:
 
 ```bash
 git reflog show feat/handlers
-# 8a4f3c1 HEAD@{0}: rebase: handlers: implement /login
-# 3e2c1f4 HEAD@{1}: commit: handlers: implement /login
-# ...
+```
+
+Sample output:
+
+```text
+8a4f3c1 HEAD@{0}: rebase: handlers: implement /login
+3e2c1f4 HEAD@{1}: commit: handlers: implement /login
+...
+```
+
+Pick the SHA you want, then restore the branch tip and let `sm` clean up the metadata. Substitute the SHA from your reflog for `<good-sha>`:
+
+```text
 git switch feat/handlers
-git reset --hard 3e2c1f4    # restore tip
-sm restack                  # let `sm` clean up the metadata
+git reset --hard <good-sha>
+sm restack
 ```
 
 After any manual `git reset` of a tracked branch, run [`sm doctor`](/commands/doctor) and then [`sm restack`](/commands/restack) so `sm`'s view catches up.

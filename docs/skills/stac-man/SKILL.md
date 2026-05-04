@@ -26,21 +26,32 @@ If `sm` isn't installed: tell the user to install it from `github.com/bluegarden
 
 ## The canonical workflow
 
+Start a feature stack from trunk (branches off `main`, parent = `main`):
+
 ```bash
-# 1. Start a feature stack from trunk
 git switch main
-sm create feat/auth-models     # branches off main, parent=main
+sm create feat/auth-models
+```
 
-# 2. Make changes, commit
-$EDITOR …
+Make the edits for this branch in your editor, then commit + restack descendants:
+
+```bash
 sm modify -a -m "models: add User and Session"
+```
 
-# 3. Stack a second branch on top
+Stack a second branch on top, edit, commit:
+
+```bash
 sm create feat/auth-handlers
-$EDITOR …
-sm modify -a -m "handlers: implement /login"
+```
 
-# 4. Submit the whole stack as PRs
+```bash
+sm modify -a -m "handlers: implement /login"
+```
+
+Submit the whole stack as PRs:
+
+```bash
 sm submit --stack
 ```
 
@@ -68,6 +79,7 @@ sm submit --stack
 | `sm show [branch] [--json]` | Detailed branch view: parent, children, ahead/behind, PR, commit list. Prefer `--json` when reading programmatically. |
 | `sm get <PR-number>` | Fetch a colleague's stack locally and reproduce its parent edges, then print `sm log`. |
 | `sm undo [--dry-run]` | Reflog-style rollback of the most recent stac-man op (last 50 ops kept under `.git/stac-man/history.json`). |
+| `sm` (no arguments, on a TTY) | Opens the interactive **cockpit**: dashboard, conflict resolver, diff viewer, command palette. Pipes / CI / non-TTY contexts fall back to `sm --help`, so this is a human-only entry point — agents should keep using explicit subcommands. |
 
 ## Decision rules for the agent
 
@@ -82,6 +94,7 @@ sm submit --stack
 - **Pulling someone else's stack to review:** prefer `sm get <PR>` over multiple `gh pr checkout` invocations — it sets the parent metadata so `sm log` mirrors the author's tree.
 - **User wants to undo what `sm` just did:** prefer `sm undo` over manual `git reset` + git config edits. Refuses while a rebase is paused — finish or abort first.
 - **Reading branch state programmatically:** for one branch, use `sm show --json`. For the whole stack, use `sm log --json` (or `sm log --porcelain` from shell pipelines). Both share the same per-branch `pr` shape so a single parser handles either.
+- **Never invoke bare `sm`:** it opens the interactive cockpit on a TTY and prints help everywhere else. Always use a specific subcommand (`sm log`, `sm submit --stack`, etc.) so the agent gets deterministic, parseable output.
 
 ## Conflict handling
 

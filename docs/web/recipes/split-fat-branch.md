@@ -90,14 +90,14 @@ Each commit becomes a branch named after its slugified subject (`models-add-user
 
 ### Per-hunk split
 
-Not supported. If you committed two unrelated changes in one commit, undo the commit first:
+Not supported. If you committed two unrelated changes in one commit, undo the commit first, then re-stage and re-commit each chunk separately. Substitute real commit messages for `"<message-a>"` / `"<message-b>"`:
 
-```bash
+```text
 git reset --soft HEAD^
 git add -p     # interactively pick hunks for commit A
-git commit -m "..."
+git commit -m "<message-a>"
 git add .      # the rest go into commit B
-git commit -m "..."
+git commit -m "<message-b>"
 sm split --names a,b --commits "1,2"
 ```
 

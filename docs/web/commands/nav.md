@@ -41,20 +41,41 @@ main
     └── feat/api-docs
 ```
 
-From `feat/api`:
+From `feat/api`, walking up hits the fork. Bare `sm up` errors:
 
 ```bash
-sm up               # error: ambiguous fork
-sm up --first       # → feat/api-docs (alphabetical)
-sm checkout feat/api-tests   # explicit
+sm up
 ```
 
-From `feat/api-tests`:
+`--first` takes the alphabetically-first child (`feat/api-docs`):
 
 ```bash
-sm down             # → feat/api
-sm bottom           # → feat/api  (the branch sitting directly on trunk)
-sm bottom; sm down  # → main
+sm up --first
+```
+
+Or pick the other fork explicitly:
+
+```bash
+sm checkout feat/api-tests
+```
+
+From `feat/api-tests`, walk one step down to the parent:
+
+```bash
+sm down
+```
+
+Or jump to the branch sitting directly on trunk (here that's `feat/api` again):
+
+```bash
+sm bottom
+```
+
+To get all the way to trunk itself, do `bottom` then one more `down`:
+
+```bash
+sm bottom
+sm down
 ```
 
 ## What it does

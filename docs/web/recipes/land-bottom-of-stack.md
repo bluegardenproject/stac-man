@@ -58,12 +58,19 @@ main
 
 ### Pick a strategy
 
+Default is `--squash`. To use a merge commit instead:
+
 ```bash
-sm land --merge     # merge commit
-sm land --rebase    # rebase merge
+sm land --merge
 ```
 
-Default is `--squash`. The flags are mutually exclusive.
+To use a rebase merge:
+
+```bash
+sm land --rebase
+```
+
+The strategy flags are mutually exclusive.
 
 ### Skip the CI gate
 

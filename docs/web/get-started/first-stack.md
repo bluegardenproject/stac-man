@@ -20,9 +20,15 @@ git switch main
 
 ## 2. Create the bottom branch
 
+Branch off and record `main` as the parent:
+
 ```bash
 sm create feat/auth-models
-$EDITOR internal/models/user.go
+```
+
+Edit the files for this branch (e.g. `internal/models/user.go`) in your editor. Once the working tree has the changes you want, commit and restack descendants in one step:
+
+```bash
 sm modify -a -m "models: add User and Session"
 ```
 
@@ -33,13 +39,19 @@ What just happened:
 
 ## 3. Stack the second branch
 
+Branch off the current branch (so the new branch's parent is `feat/auth-models`):
+
 ```bash
 sm create feat/auth-handlers
-$EDITOR internal/handlers/login.go
+```
+
+Edit the files for this branch (e.g. `internal/handlers/login.go`), then commit:
+
+```bash
 sm modify -a -m "handlers: implement /login"
 ```
 
-`sm create` again branches off the current branch, so `feat/auth-handlers`'s parent is `feat/auth-models`. Now `sm log` shows the chain:
+Now `sm log` shows the chain:
 
 ```
 stac-man
@@ -64,11 +76,15 @@ Re-running `sm submit --stack` later is idempotent: branches that match origin a
 
 ## 5. Iterate
 
-Make a change to the bottom branch:
+Switch to the bottom branch:
 
 ```bash
 sm checkout feat/auth-models
-$EDITOR internal/models/user.go
+```
+
+Edit the files you want to change (e.g. `internal/models/user.go`), then commit:
+
+```bash
 sm modify -a -m "models: add password hash"
 ```
 

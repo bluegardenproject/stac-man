@@ -20,9 +20,9 @@ Skill is the source of truth for *what* to check. Deliberately not a CI gate —
 - A working Go toolchain (`go run` for `tools/docscan`).
 - Read access to:
   - `cmd/*.go` (cobra source)
-  - `docs/site/commands/*.md` (one page per command)
-  - `docs/site/recipes/*.md` (multi-step workflows)
-  - `docs/site/concepts/*.md` (mental model)
+  - `docs/web/commands/*.md` (one page per command)
+  - `docs/web/recipes/*.md` (multi-step workflows)
+  - `docs/web/concepts/*.md` (mental model)
   - `docs/skills/stac-man/SKILL.md` (end-user agent skill, mirrored into other repos)
   - `.cursor/skills/stac-man-dev/SKILL.md` (contributor skill)
 
@@ -37,20 +37,20 @@ Source of truth: `go run ./tools/docscan` — emits JSON of the cobra tree. Pars
 ```bash
 go run ./tools/docscan > /tmp/sm-cobra.json
 jq -r '.commands[] | select(.path != "sm") | .path' /tmp/sm-cobra.json | sort
-ls docs/site/commands/*.md | xargs -L1 basename | sed 's/\.md$//' | sort
+ls docs/web/commands/*.md | xargs -L1 basename | sed 's/\.md$//' | sort
 ```
 
 Compare:
 
-- A command in the cobra output without a corresponding `docs/site/commands/<name>.md` is **missing documentation**.
-- A `docs/site/commands/*.md` page without a matching cobra command is **stale documentation**.
+- A command in the cobra output without a corresponding `docs/web/commands/<name>.md` is **missing documentation**.
+- A `docs/web/commands/*.md` page without a matching cobra command is **stale documentation**.
 
 Two known mappings where one page covers multiple commands:
 
 | Page | Covers cobra commands |
 |---|---|
-| `docs/site/commands/nav.md` | `up`, `down`, `top`, `bottom` |
-| `docs/site/commands/continue.md` | `continue`, `abort` |
+| `docs/web/commands/nav.md` | `up`, `down`, `top`, `bottom` |
+| `docs/web/commands/continue.md` | `continue`, `abort` |
 
 Treat these as covered; don't flag them as missing.
 
@@ -88,11 +88,11 @@ If `sm log`'s rendering changed (markers, indentation, PR pill format), the reci
 
 Recipe pages currently in scope:
 
-- `docs/site/recipes/split-fat-branch.md`
-- `docs/site/recipes/land-bottom-of-stack.md`
-- `docs/site/recipes/recover-from-bad-rebase.md`
-- `docs/site/recipes/review-someones-stack.md`
-- `docs/site/recipes/absorb-fixups.md`
+- `docs/web/recipes/split-fat-branch.md`
+- `docs/web/recipes/land-bottom-of-stack.md`
+- `docs/web/recipes/recover-from-bad-rebase.md`
+- `docs/web/recipes/review-someones-stack.md`
+- `docs/web/recipes/absorb-fixups.md`
 
 ### 4. Skills mirror the docs
 
@@ -100,13 +100,13 @@ Three skill files describe `sm` from different angles. Drift between them is a s
 
 - `docs/skills/stac-man/SKILL.md` — what end-user agents drive `sm` to do.
 - `.cursor/skills/stac-man-dev/SKILL.md` — how contributors work on this repo.
-- `docs/site/` — public-facing prose.
+- `docs/web/` — public-facing prose.
 
 Cross-check:
 
 - Every "decision rule" (e.g. "user says 'rebase' → use `sm restack`") in the end-user skill should be supported by a real command in the docs site. If a rule references a command that's been removed, flag it.
-- Every "NEVER" in either skill should appear as a "what NOT to do" callout somewhere in the relevant docs page (typically the [Recover from a bad rebase](docs/site/recipes/recover-from-bad-rebase.md) recipe or a command page).
-- Workflow examples in the skills (the canonical workflow block) should match the [first-stack tutorial](docs/site/get-started/first-stack.md) verbatim or close to it.
+- Every "NEVER" in either skill should appear as a "what NOT to do" callout somewhere in the relevant docs page (typically the [Recover from a bad rebase](docs/web/recipes/recover-from-bad-rebase.md) recipe or a command page).
+- Workflow examples in the skills (the canonical workflow block) should match the [first-stack tutorial](docs/web/get-started/first-stack.md) verbatim or close to it.
 
 ### 5. New commands have a recipe touchpoint
 
@@ -128,22 +128,22 @@ Output a markdown report shaped like this. The user (or you) will fix issues fro
 # stac-man docs drift report — <date>
 
 ## 1. Missing command pages
-- [ ] `sm <name>` — no `docs/site/commands/<name>.md`. Suggested: copy the closest existing page as a template.
+- [ ] `sm <name>` — no `docs/web/commands/<name>.md`. Suggested: copy the closest existing page as a template.
 
 ## 2. Stale flags
-- [ ] `docs/site/commands/<page>.md` documents `--<flag>` which no longer exists on `sm <command>`.
+- [ ] `docs/web/commands/<page>.md` documents `--<flag>` which no longer exists on `sm <command>`.
 
 ## 3. Undocumented flags
-- [ ] `sm <command>` has flag `--<flag>` not mentioned in `docs/site/commands/<page>.md`.
+- [ ] `sm <command>` has flag `--<flag>` not mentioned in `docs/web/commands/<page>.md`.
 
 ## 4. Recipe drift
-- [ ] `docs/site/recipes/<page>.md` shows a `sm log` fragment that doesn't match current output.
+- [ ] `docs/web/recipes/<page>.md` shows a `sm log` fragment that doesn't match current output.
 
 ## 5. Skill drift
 - [ ] `docs/skills/stac-man/SKILL.md` references `sm <gone>` which has been removed.
 
 ## 6. New commands without recipe touchpoints
-- [ ] `sm <new>` (added in <commit>) has no recipe mention. Suggested home: `docs/site/recipes/<page>.md`.
+- [ ] `sm <new>` (added in <commit>) has no recipe mention. Suggested home: `docs/web/recipes/<page>.md`.
 ```
 
 For every item, include:

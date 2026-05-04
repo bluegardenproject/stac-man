@@ -5,7 +5,7 @@
 // raw color name.
 //
 // The brand palette lives in palette.json next to this file. That same
-// file is consumed by the docs site under docs/site/, so the Go TUI and
+// file is consumed by the docs site under docs/web/, so the Go TUI and
 // the website can never drift on colors. palette.json is the single
 // source-of-truth; if you need to tweak a color, edit it there.
 package theme

@@ -38,9 +38,16 @@ The non-PR commands (`create`, `modify`, `restack`, `sync`, `log`, `show`, `abso
 
 ## Updating
 
+Install the latest release in place:
+
 ```bash
-sm update           # install the latest release in-place
-sm update --check   # only report whether a newer release exists
+sm update
+```
+
+Or just check whether a newer release exists, without changing anything:
+
+```bash
+sm update --check
 ```
 
 `sm update` shells out to the same install one-liner above. Dev builds (`Version == "dev"`) skip the network check and print a hint instead.
@@ -59,18 +66,27 @@ make build         # → ./sm with embedded version + build time
 
 Tab-completes subcommands and tracked branch names on `sm checkout`, `sm parent`, `sm move`, `sm show`.
 
-```bash
-# zsh
-sm completion zsh > "${fpath[1]}/_sm"        # restart your shell
+Pick the tab for your shell, paste, then restart your shell so the new completions load.
 
-# bash
-sm completion bash > /etc/bash_completion.d/sm
+::: code-group
 
-# fish
-sm completion fish > ~/.config/fish/completions/sm.fish
-
-# powershell
-sm completion powershell > sm.ps1; . ./sm.ps1
+```zsh [zsh]
+sm completion zsh > "${fpath[1]}/_sm"
 ```
+
+```bash [bash]
+sm completion bash > /etc/bash_completion.d/sm
+```
+
+```fish [fish]
+sm completion fish > ~/.config/fish/completions/sm.fish
+```
+
+```powershell [powershell]
+sm completion powershell > sm.ps1
+. ./sm.ps1
+```
+
+:::
 
 Now jump to [your first stack](./first-stack) for the canonical workflow.

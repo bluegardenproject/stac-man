@@ -42,11 +42,11 @@ sm absorb --base feat/api-models
 
 ## When this beats manual fixups
 
-Without `sm absorb`, the equivalent is:
+Without `sm absorb`, the equivalent is the three-step template below — one `git commit --fixup` per hunk, an interactive autosquash rebase, and a stac-man restack:
 
-```bash
-git commit --fixup=<sha>     # for each hunk
-git rebase -i --autosquash <base>
+```text
+git commit --fixup=<sha-of-target-commit>   # repeat per hunk
+git rebase -i --autosquash <base-branch>
 sm restack
 ```
 

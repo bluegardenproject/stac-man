@@ -4,14 +4,14 @@ A teammate opened PR #142, and PR #142 is the top of a stack. You want to read t
 
 ## What you'd otherwise do
 
-Without `sm`:
+Without `sm`, you'd manually walk the PR chain — find each PR's base ref, check it out, repeat:
 
-```bash
-gh pr view 142 --json baseRefName    # find the parent PR
-gh pr checkout <the parent>
-gh pr view <parent> --json baseRefName
-gh pr checkout <grandparent>
-…
+```text
+gh pr view 142 --json baseRefName            # find the parent PR
+gh pr checkout <parent-branch-name>
+gh pr view <parent-pr-number> --json baseRefName
+gh pr checkout <grandparent-branch-name>
+# ...repeat down to trunk
 ```
 
 Tedious, and you don't end up with parent metadata recorded — `sm log` won't render the tree.
@@ -45,12 +45,22 @@ main
 
 `feat/web-form` is the PR you want to review (HEAD is on it). `CI conflict` flags it as `CONFLICTING` on GitHub — typical when an ancestor has merged but the local chain hasn't been rebased onto trunk yet. Run `sm sync` to clean that up before reading the diff.
 
-Now you can:
+Now you can walk the chain bottom-up. Jump to the branch sitting directly on trunk (`feat/db-schema`):
 
 ```bash
-sm bottom                # walk to feat/db-schema
-sm up                    # → feat/api-endpoints
-sm up                    # → feat/web-form
+sm bottom
+```
+
+Step up one branch (`feat/api-endpoints`):
+
+```bash
+sm up
+```
+
+And once more (`feat/web-form`):
+
+```bash
+sm up
 ```
 
 Or jump directly:

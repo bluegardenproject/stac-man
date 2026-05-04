@@ -18,12 +18,16 @@ sm create <branch> [-m <msg>] [-a] [--include-untracked]
 
 ## Examples
 
-Branch off and start dirty:
+Branch off and start dirty — switch to trunk first, then create the branch:
 
 ```bash
 git switch main
 sm create feat/auth-models
-$EDITOR …
+```
+
+Edit the files you want, then commit and restack with one call:
+
+```bash
 sm modify -a -m "models: add User"
 ```
 
