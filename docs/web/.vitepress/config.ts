@@ -29,7 +29,9 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/stac-man/favicon-16x16.png' }],
     ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/stac-man/apple-touch-icon.png' }],
     ['link', { rel: 'manifest', href: '/stac-man/site.webmanifest' }],
-    ['meta', { name: 'theme-color', content: '#FF10F0' }],
+    // theme-color matches --logo-pink in style.css and the logo's
+    // primary highlight. Mobile browsers tint the address bar with this.
+    ['meta', { name: 'theme-color', content: '#FF1493' }],
     ['meta', { property: 'og:title', content: 'stac-man — stacked PRs, locally' }],
     ['meta', { property: 'og:description', content: 'A CLI for stacked pull requests. Free, local-only, no SaaS, no IDE plugin.' }],
     ['meta', { property: 'og:type', content: 'website' }],

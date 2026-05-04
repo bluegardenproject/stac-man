@@ -14,8 +14,8 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#FF10F0",
-  "background_color": "#120018",
+  "theme_color": "#FF1493",
+  "background_color": "#0E1238",
   "display": "standalone",
   "start_url": "/stac-man/",
   "scope": "/stac-man/"
