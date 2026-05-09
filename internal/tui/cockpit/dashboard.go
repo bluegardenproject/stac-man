@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/bluegardenproject/stac-man/internal/gh"
 	"github.com/bluegardenproject/stac-man/internal/service"
 	"github.com/bluegardenproject/stac-man/internal/ui"
 	"github.com/bluegardenproject/stac-man/internal/ui/theme"
@@ -201,6 +202,9 @@ func (m Model) viewDashboard() string {
 		if m.snapshot.Paused != nil {
 			b.WriteString(viewPausedBanner(m.snapshot.Paused) + "\n\n")
 		}
+		if status := viewGitHubStatusBanner(m); status != "" {
+			b.WriteString(status + "\n\n")
+		}
 		b.WriteString(viewDashboardPanes(m))
 	}
 
@@ -247,6 +251,17 @@ func viewPausedBanner(p *service.PausedSnapshot) string {
 	return ui.Render(theme.ErrorToast, fmt.Sprintf(" paused on %s — %d conflict(s)", branch, len(p.ConflictPaths)))
 }
 
+func viewGitHubStatusBanner(m Model) string {
+	switch {
+	case m.statusRefreshing:
+		return ui.Render(theme.Dimmed, "refreshing GitHub status… keeping last cached badges visible")
+	case m.statusErr != nil:
+		return ui.Render(theme.Warn, "GitHub status refresh failed: ") + m.statusErr.Error()
+	default:
+		return ""
+	}
+}
+
 // viewDashboardPanes composes the tree pane (left) with the detail
 // pane (right) using lipgloss.JoinHorizontal. Widths default to a
 // sane 80-column layout before the first WindowSizeMsg lands.
@@ -289,7 +304,7 @@ func viewTree(m Model, _ int) string {
 	}
 	var b strings.Builder
 	for i, it := range items {
-		b.WriteString(renderTreeRow(it, i == m.cursor))
+		b.WriteString(renderTreeRow(it, i == m.cursor, m.snapshot.GitHubStatus[it.Branch]))
 		b.WriteByte('\n')
 	}
 	return b.String()
@@ -298,7 +313,7 @@ func viewTree(m Model, _ int) string {
 // renderTreeRow draws one row of the tree pane. Selection is shown
 // by a cyan caret + a bold pass over the row so it pops at any
 // terminal contrast.
-func renderTreeRow(it service.CheckoutItem, selected bool) string {
+func renderTreeRow(it service.CheckoutItem, selected bool, status service.StatusBranch) string {
 	caret := "  "
 	if selected {
 		caret = ui.Render(theme.Accent, "▸ ")
@@ -334,10 +349,42 @@ func renderTreeRow(it service.CheckoutItem, selected bool) string {
 	if it.PR > 0 {
 		row += ui.Render(theme.Dimmed, fmt.Sprintf("  #%d", it.PR))
 	}
+	if status.PR > 0 {
+		if checks := renderDashboardChecks(status.Checks); checks != "" {
+			row += " " + checks
+		}
+		if merge := renderDashboardMerge(status.Mergeable); merge != "" {
+			row += " " + merge
+		}
+	}
 	if selected {
 		row = lipgloss.NewStyle().Bold(true).Render(row)
 	}
 	return row
+}
+
+func renderDashboardChecks(c gh.CheckRollup) string {
+	switch c {
+	case gh.ChecksPass:
+		return ui.Render(theme.BadgeCIPass, "CI pass")
+	case gh.ChecksPending:
+		return ui.Render(theme.BadgeCIPending, "CI pending")
+	case gh.ChecksFail:
+		return ui.Render(theme.BadgeCIFail, "CI fail")
+	default:
+		return ""
+	}
+}
+
+func renderDashboardMerge(m gh.Mergeability) string {
+	switch m {
+	case gh.MergeMergeable:
+		return ui.Render(theme.BadgeMergeReady, "mergeable")
+	case gh.MergeConflicting:
+		return ui.Render(theme.BadgeMergeConflict, "conflict")
+	default:
+		return ""
+	}
 }
 
 func branchStyleFor(it service.CheckoutItem) lipgloss.Style {

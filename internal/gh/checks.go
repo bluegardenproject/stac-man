@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 )
 
 // CheckRollup values are defined in merge.go: ChecksPass, ChecksFail,
@@ -154,112 +151,4 @@ func parseMergeable(s string) Mergeability {
 	default:
 		return MergeUnknown
 	}
-}
-
-// checksCacheTTL is how long a fetched PRStatus stays valid before
-// the next `sm log` reissues the gh round-trip. 60s is the value the
-// roadmap calls out — long enough to make rapid `sm log` calls
-// snappy, short enough that a CI flip is visible within a coffee
-// break.
-const checksCacheTTL = 60 * time.Second
-
-// ChecksCache is the on-disk shared cache backing both the CI dot
-// and the mergeability glyph. Keyed by PR number stringified so the
-// JSON file stays human-readable; the entries embed PRStatus
-// directly (it's already a JSON-friendly shape).
-type ChecksCache struct {
-	Entries map[string]checksCacheEntry `json:"entries"`
-}
-
-type checksCacheEntry struct {
-	Status    PRStatus  `json:"status"`
-	FetchedAt time.Time `json:"fetched_at"`
-}
-
-// ChecksCachePath returns the canonical cache file location given the
-// .git directory. Callers pass the path returned by `git rev-parse
-// --git-dir` so worktrees get their own cache.
-func ChecksCachePath(gitDir string) string {
-	return filepath.Join(gitDir, "stac-man", "checks-cache.json")
-}
-
-// LoadChecksCache reads the cache from disk, returning an empty cache
-// (never nil) when the file is missing or corrupt. A corrupt cache is
-// silently dropped instead of bubbling up — `sm log` should never
-// fail just because the cache file is malformed.
-func LoadChecksCache(gitDir string) *ChecksCache {
-	c := &ChecksCache{Entries: map[string]checksCacheEntry{}}
-	if gitDir == "" {
-		return c
-	}
-	data, err := os.ReadFile(ChecksCachePath(gitDir))
-	if err != nil {
-		return c
-	}
-	var loaded ChecksCache
-	if err := json.Unmarshal(data, &loaded); err != nil {
-		return c
-	}
-	if loaded.Entries == nil {
-		loaded.Entries = map[string]checksCacheEntry{}
-	}
-	return &loaded
-}
-
-// Get returns the cached status for a PR number when the entry is
-// still within the TTL.
-func (c *ChecksCache) Get(number int) (PRStatus, bool) {
-	if c == nil {
-		return PRStatus{}, false
-	}
-	e, ok := c.Entries[fmt.Sprintf("%d", number)]
-	if !ok {
-		return PRStatus{}, false
-	}
-	if time.Since(e.FetchedAt) > checksCacheTTL {
-		return PRStatus{}, false
-	}
-	return e.Status, true
-}
-
-// Put stores a status under the PR number with the current timestamp.
-func (c *ChecksCache) Put(number int, st PRStatus) {
-	if c == nil || c.Entries == nil {
-		return
-	}
-	c.Entries[fmt.Sprintf("%d", number)] = checksCacheEntry{Status: st, FetchedAt: time.Now()}
-}
-
-// Save serialises the cache to its canonical path, creating the
-// stac-man subdirectory if needed. Errors are returned but callers
-// typically swallow them — a failed cache write should not break
-// rendering.
-func (c *ChecksCache) Save(gitDir string) error {
-	if gitDir == "" || c == nil {
-		return nil
-	}
-	p := ChecksCachePath(gitDir)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		return err
-	}
-	data, err := json.Marshal(c)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(p, data, 0o644)
-}
-
-// InvalidateChecksCache removes the cache file on disk. Called after
-// `sm submit` and `sm sync` because both can flip CI state and
-// mergeability — keeping the stale entry would mean the next
-// `sm log` shows the pre-mutation status.
-func InvalidateChecksCache(gitDir string) error {
-	if gitDir == "" {
-		return nil
-	}
-	err := os.Remove(ChecksCachePath(gitDir))
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
 }

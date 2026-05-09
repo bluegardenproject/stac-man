@@ -27,7 +27,9 @@ In a pipe, CI, or any other non-TTY context, bare `sm` falls back to `sm --help`
 The cockpit has five screens; the dashboard is where you start.
 
 ### Dashboard
-Two panes. The **left pane** is your stack tree, rendered the same way as `sm log` — current branch highlighted, needs-restack markers, PR pills. The **right pane** is the detail view of whatever row your cursor is on: parent, children, ahead/behind, PR state, and the recent commit list (powered by `sm show`).
+Two panes. The **left pane** is your stack tree, rendered from local metadata and cached GitHub status — current branch highlighted, needs-restack markers, PR pills, and the last known CI/mergeability badges when available. The **right pane** is the detail view of whatever row your cursor is on: parent, children, ahead/behind, PR state, and the recent commit list (powered by `sm show`).
+
+On entry, the cockpit renders immediately from local data and the last cached PR/status snapshots. If tracked PRs exist, it starts a background GitHub status refresh and keeps the old badges visible while the request is in flight. When fresh status arrives, rows update in place; if the refresh fails, the dashboard stays visible and shows a non-blocking warning.
 
 | Key | What it does |
 |---|---|
@@ -74,7 +76,7 @@ Pressing `d` on a tracked branch opens a two-pane diff. **Left** lists the commi
 | `esc` | Back to the dashboard |
 
 ### Command palette
-`ctrl+p` opens a fuzzy-searchable list of every dashboard action (checkout, restack, submit, …). Type to filter, `enter` runs, `esc` closes. Useful when you forget a key binding or want to pick an action without leaving the keyboard.
+`ctrl+p` opens a fuzzy-searchable list of every dashboard action (checkout, restack, submit, …), plus refresh actions such as `refresh GitHub status`. Type to filter, `enter` runs, `esc` closes. Useful when you forget a key binding or want to pick an action without leaving the keyboard.
 
 ### Help overlay
 `?` brings up a categorised cheat sheet for every key the cockpit understands. The list is generated from the same keymap the action handlers use, so it can't drift.
@@ -83,7 +85,7 @@ Pressing `d` on a tracked branch opens a two-pane diff. **Left** lists the commi
 
 To keep the UX coherent, the cockpit splits its work in two:
 
-- **In-process (fast, local):** `checkout`, `restack`, `track`, `untrack`, `modify`, `fold`, `absorb`, `undo`, plus the conflict resolver. These call the same `internal/service` layer the CLI uses, so paused-rebase semantics, the undo journal, and `git config` updates behave identically.
+- **In-process (fast, local):** `checkout`, `restack`, `track`, `untrack`, `modify`, `fold`, `absorb`, `undo`, cached dashboard refreshes, GitHub status refreshes, plus the conflict resolver. These call the same `internal/service` layer the CLI uses, so paused-rebase semantics, the undo journal, cache updates, and `git config` updates behave identically.
 - **Shell-out (`tea.ExecProcess`):** `submit`, `sync`, `land`. These can prompt through `gh` or take a long time, so the cockpit yields the terminal to the real `sm` subcommand and resumes when it exits. Output is exactly what you'd see running `sm submit` directly.
 
 A network action that leaves the system in a paused rebase (e.g. `sm sync` hitting a conflict) auto-routes you into the conflict resolver on the next snapshot reload — no manual navigation needed.

@@ -57,6 +57,13 @@ func buildPaletteItems(m Model) []paletteAction {
 			return m, loadSnapshotCmd(m.ctx, m.svc)
 		},
 	})
+	out = append(out, paletteAction{
+		Label: "refresh GitHub status",
+		Run: func(m Model) (Model, tea.Cmd) {
+			m.lastAction = nil
+			return m.startStatusRefresh()
+		},
+	})
 
 	// Cursor-targeted actions. Branch is captured by value so a
 	// later cursor move doesn't change which branch the palette

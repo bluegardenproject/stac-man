@@ -39,11 +39,11 @@ stac-man
 
 main
 └─ feat/db-schema  #140 merged
-   └─ feat/api-endpoints  #141 open  CI ready
-      └─ feat/web-form  ← current  #142 open  CI conflict
+   └─ feat/api-endpoints  #141 open
+      └─ feat/web-form  ← current  #142 open
 ```
 
-`feat/web-form` is the PR you want to review (HEAD is on it). `CI conflict` flags it as `CONFLICTING` on GitHub — typical when an ancestor has merged but the local chain hasn't been rebased onto trunk yet. Run `sm sync` to clean that up before reading the diff.
+`feat/web-form` is the PR you want to review (HEAD is on it). If you need GitHub's current checks or mergeability before reviewing, run `sm status`. If the stack is stale because an ancestor has merged, run `sm sync` to clean that up before reading the diff.
 
 Now you can walk the chain bottom-up. Jump to the branch sitting directly on trunk (`feat/db-schema`):
 

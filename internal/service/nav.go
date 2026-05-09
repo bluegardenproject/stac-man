@@ -78,7 +78,13 @@ func (s *Service) CheckoutTree(ctx context.Context) (current string, items []Che
 		return "", nil, err
 	}
 	current, _ = s.G.CurrentBranch(ctx)
+	needsRestack := s.computeNeedsRestackMap(ctx, g)
 
+	return current, checkoutItemsFromGraph(trunk, current, g, needsRestack), nil
+}
+
+func checkoutItemsFromGraph(trunk, current string, g *stack.Graph, needsRestack map[string]bool) []CheckoutItem {
+	items := []CheckoutItem{}
 	items = append(items, CheckoutItem{
 		Branch:    trunk,
 		Depth:     0,
@@ -100,7 +106,7 @@ func (s *Service) CheckoutTree(ctx context.Context) (current string, items []Che
 				Branch:         child.Name,
 				Depth:          depth,
 				IsCurrent:      child.Name == current,
-				NeedsRestack:   s.needsRestack(child),
+				NeedsRestack:   needsRestack[child.Name],
 				PR:             child.PR,
 				AncestorIsLast: ancestorsCopy,
 				IsLastChild:    isLast,
@@ -110,7 +116,7 @@ func (s *Service) CheckoutTree(ctx context.Context) (current string, items []Che
 	}
 	walk(trunk, 1, nil)
 
-	return current, items, nil
+	return items
 }
 
 // CheckoutChoices returns trunk + every tracked branch as a flat,

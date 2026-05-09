@@ -125,6 +125,31 @@ func TestSubmissionTargetsStackIncludesSubmittedAncestor(t *testing.T) {
 	}
 }
 
+func TestSubmittedPRNumbersMergesStoredCreatedAndUpdated(t *testing.T) {
+	targets := []stack.Branch{
+		{Name: "feat-a", PR: 10},
+		{Name: "feat-b"},
+		{Name: "feat-c", PR: 12},
+		{Name: "feat-d", PR: 10},
+	}
+	report := SubmitReport{
+		Created: []SubmitPR{{Branch: "feat-b", Number: 11}},
+		Updated: []SubmitPR{{Branch: "feat-c", Number: 13}},
+	}
+	got := submittedPRNumbers(report, targets)
+	for _, want := range []int{10, 11, 13} {
+		if !containsInt(got, want) {
+			t.Fatalf("submittedPRNumbers = %v, missing %d", got, want)
+		}
+	}
+	if containsInt(got, 12) {
+		t.Fatalf("submittedPRNumbers = %v, old feat-c PR should be replaced by updated PR 13", got)
+	}
+	if len(got) != 3 {
+		t.Fatalf("submittedPRNumbers = %v, want three unique numbers", got)
+	}
+}
+
 // TestSubmissionTargetsStackIncludesSubmittedImmediateParent locks
 // in B10's "always include all ancestors" rule even when the
 // immediate parent already has a PR — the exact shape that used to
@@ -223,6 +248,15 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func containsInt(xs []int, want int) bool {
+	for _, x := range xs {
+		if x == want {
+			return true
+		}
+	}
+	return false
 }
 
 // TestDerivePRMetaSingleCommit pins B6: a branch with exactly one

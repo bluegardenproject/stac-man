@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bluegardenproject/stac-man/internal/restack"
+	"github.com/bluegardenproject/stac-man/internal/stack"
 )
 
 // PausedSnapshot is the interactive cockpit's view of a paused
@@ -19,15 +20,13 @@ type PausedSnapshot = restack.PausedInfo
 // CheckoutItems + Paused in one method means the rendered UI cannot
 // disagree with itself across panes — every refresh comes from a
 // single graph load, a single git HEAD read, and a single paused-
-// state lookup. (Internally Snapshot still calls LogData and
-// CheckoutTree, so the underlying store is read twice; that's fine
-// for now since cockpit refreshes are user-driven and not on a
-// hot path.)
+// state lookup.
 type DashboardSnapshot struct {
 	Trunk         string
 	Current       string
 	Log           *LogResult
 	CheckoutItems []CheckoutItem
+	GitHubStatus  map[string]StatusBranch
 	Paused        *PausedSnapshot
 }
 
@@ -49,15 +48,19 @@ func (s *Service) Snapshot(ctx context.Context, logOpts LogOptions) (*DashboardS
 		return nil, err
 	}
 
-	logResult, err := s.LogData(ctx, logOpts)
+	g, err := stack.Load(ctx, s.Store)
 	if err != nil {
 		return nil, err
 	}
-
-	current, items, err := s.CheckoutTree(ctx)
+	current, err := s.G.CurrentBranch(ctx)
 	if err != nil {
-		return nil, err
+		// Detached HEAD shouldn't block cockpit rendering.
+		current = ""
 	}
+	needsRestack := s.computeNeedsRestackMap(ctx, g)
+	logResult := logResultFromData(s.buildLogDataWithGraph(ctx, trunk, current, g, logOpts, needsRestack))
+	items := checkoutItemsFromGraph(trunk, current, g, needsRestack)
+	statuses := s.cachedPRStatusBranches(ctx, items)
 
 	paused, err := s.PausedState(ctx)
 	if err != nil {
@@ -69,6 +72,7 @@ func (s *Service) Snapshot(ctx context.Context, logOpts LogOptions) (*DashboardS
 		Current:       current,
 		Log:           logResult,
 		CheckoutItems: items,
+		GitHubStatus:  statuses,
 		Paused:        paused,
 	}, nil
 }

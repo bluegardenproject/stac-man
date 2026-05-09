@@ -232,6 +232,7 @@ func (s *Service) Sync(ctx context.Context, opts SyncOptions) (SyncReport, error
 		prsByBranch, ghErr := s.fetchTrackedPRs(ctx, g, ghClient, excluded)
 		if ghErr == nil {
 			prog.Done("checked PR merge state on GitHub")
+			s.persistPRSnapshots(ctx, prsByBranch)
 			mergedByPR = mergedByPRState(g, prsByBranch, excluded)
 		} else {
 			prog.Fail("checking PR merge state on GitHub")
@@ -310,13 +311,13 @@ func (s *Service) Sync(ctx context.Context, opts SyncOptions) (SyncReport, error
 		}
 	}
 
-	// Sync's restack cascade rewrites every descendant after a
-	// merge upstream — both CI state and mergeability go stale on
-	// GitHub the moment the next `sm submit` pushes, but the cache
-	// from before sync would still claim the old state. Drop it so
-	// `sm log` re-fetches on next render.
-	if gitDir, err := s.G.GitDir(ctx); err == nil {
-		_ = gh.InvalidateChecksCache(gitDir)
+	if hasAnyTrackedPR(g) {
+		if ghClient == nil {
+			ghClient = gh.New("")
+		}
+		prog.Start("refreshing GitHub status cache")
+		s.refreshCachedPRStatuses(ctx, g, ghClient)
+		prog.Done("refreshed GitHub status cache")
 	}
 
 	return r, nil

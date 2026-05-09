@@ -87,6 +87,44 @@ func TestPRForBranchMissing(t *testing.T) {
 	}
 }
 
+func TestPRsForBranchesCallsGhOncePerBranch(t *testing.T) {
+	r := &fakeRunner{
+		responses: map[string]fakeResponse{
+			"pr list --head feat-a --state all --limit 1 --json number,title,body,state,isDraft,url,baseRefName,headRefName": {
+				stdout: `[{"number":1,"title":"A","state":"OPEN","isDraft":false,"url":"https://github.com/acme/widgets/pull/1","baseRefName":"main","headRefName":"feat-a"}]`,
+			},
+			"pr list --head feat-b --state all --limit 1 --json number,title,body,state,isDraft,url,baseRefName,headRefName": {
+				stdout: `[{"number":2,"title":"B","state":"OPEN","isDraft":false,"url":"https://github.com/acme/widgets/pull/2","baseRefName":"feat-a","headRefName":"feat-b"}]`,
+			},
+			"pr list --head feat-c --state all --limit 1 --json number,title,body,state,isDraft,url,baseRefName,headRefName": {
+				stdout: `[]`,
+			},
+		},
+	}
+	c := NewWithRunner(r)
+	prs, err := c.PRsForBranches(context.Background(), []string{"feat-a", "feat-b", "feat-c"})
+	if err != nil {
+		t.Fatalf("PRsForBranches: %v", err)
+	}
+	if len(r.calls) != 3 {
+		t.Fatalf("gh call count = %d, want 3 (one pr list per branch); calls=%v", len(r.calls), r.calls)
+	}
+	for i, branch := range []string{"feat-a", "feat-b", "feat-c"} {
+		got := r.calls[i]
+		for _, want := range []string{"pr", "list", "--head", branch} {
+			if !contains(got, want) {
+				t.Fatalf("call %d = %v, want it to include %q", i, got, want)
+			}
+		}
+	}
+	if prs["feat-a"].Number != 1 || prs["feat-b"].Number != 2 {
+		t.Fatalf("unexpected PR map: %+v", prs)
+	}
+	if _, ok := prs["feat-c"]; ok {
+		t.Fatalf("feat-c had no PR response but is present: %+v", prs["feat-c"])
+	}
+}
+
 func TestCreatePRParsesURL(t *testing.T) {
 	r := &fakeRunner{
 		fallback: fakeResponse{

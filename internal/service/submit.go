@@ -215,6 +215,7 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 			}
 			r.Updated = append(r.Updated, SubmitPR{Branch: b.Name, Number: existing.Number, URL: existing.URL})
 			s.persistPR(ctx, b.Name, existing.Number)
+			s.persistPRSnapshot(ctx, b.Name, existing)
 			continue
 		}
 
@@ -240,6 +241,14 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		prog.Done(fmt.Sprintf("created PR #%d for %s", num, b.Name))
 		r.Created = append(r.Created, SubmitPR{Branch: b.Name, Number: num})
 		s.persistPR(ctx, b.Name, num)
+		s.persistPRSnapshot(ctx, b.Name, gh.PR{
+			Number:  num,
+			Title:   title,
+			State:   gh.PRStateOpen,
+			IsDraft: opts.Draft,
+			Base:    base,
+			Head:    b.Name,
+		})
 	}
 
 	// Plain `sm submit` only refreshed the current branch. If any
@@ -262,15 +271,38 @@ func (s *Service) Submit(ctx context.Context, opts SubmitOptions) (SubmitReport,
 		s.applyStackTables(ctx, client, g, targets, &r, prog)
 	}
 
-	// Submit can change CI state (push triggers a fresh run) and
-	// mergeability (retargeted base, new tip on origin). The cache
-	// would otherwise serve the pre-push status to the very next
-	// `sm log`, defeating the round-trip we just paid for.
-	if gitDir, err := s.G.GitDir(ctx); err == nil {
-		_ = gh.InvalidateChecksCache(gitDir)
-	}
+	s.invalidatePRStatusSnapshots(ctx, submittedPRNumbers(r, targets))
 
 	return r, nil
+}
+
+func submittedPRNumbers(r SubmitReport, targets []stack.Branch) []int {
+	byBranch := map[string]int{}
+	for _, t := range targets {
+		if t.PR > 0 {
+			byBranch[t.Name] = t.PR
+		}
+	}
+	for _, pr := range r.Created {
+		if pr.Number > 0 {
+			byBranch[pr.Branch] = pr.Number
+		}
+	}
+	for _, pr := range r.Updated {
+		if pr.Number > 0 {
+			byBranch[pr.Branch] = pr.Number
+		}
+	}
+	seen := map[int]bool{}
+	var out []int
+	for _, n := range byBranch {
+		if n == 0 || seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
 }
 
 // applyStackTables walks every target with a known PR number and

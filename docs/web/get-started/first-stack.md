@@ -101,6 +101,7 @@ sm submit --stack
 When PR #1 has approvals and a green CI:
 
 ```bash
+sm status
 sm checkout feat/auth-handlers
 sm land
 ```
@@ -113,10 +114,10 @@ Your tree now looks like:
 stac-man
 
 main
-└─ feat/auth-handlers  ← current  #2 open  CI ready
+└─ feat/auth-handlers  ← current  #2 open
 ```
 
-The PR #2 stack table is also refreshed in place — it no longer mentions the merged `feat/auth-models` row.
+The PR #2 stack table and cached GitHub metadata are refreshed in place — it no longer mentions the merged `feat/auth-models` row.
 
 ## What to read next
 

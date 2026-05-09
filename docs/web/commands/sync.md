@@ -1,6 +1,6 @@
 # sm sync
 
-Pull trunk, delete merged branches, restack survivors, retarget PR bases on GitHub.
+Pull trunk, delete merged branches, restack survivors, retarget PR bases on GitHub, and refresh cached PR/status rows.
 
 ## Synopsis
 
@@ -38,6 +38,7 @@ retargeted PR bases on GitHub:
 5. **Delete merged branches locally.**
 6. **Restack survivors** onto their (possibly new) parents.
 7. **Retarget PR bases on GitHub** for any branch whose parent changed.
+8. **Refresh cached GitHub metadata** for tracked PRs so local-first views have the latest known PR summaries, checks, and mergeability.
 
 See [Concepts → Sync](/concepts/sync) for the mental model.
 
@@ -56,8 +57,13 @@ Resolve, `git add`, then [`sm continue`](./continue).
 - Push. If sync changed your local stack, run [`sm submit`](./submit) `--stack` after.
 - Touch trunk if it's diverged from origin (refuses with an error rather than risk a non-fast-forward).
 
+## Cache behavior
+
+`sm sync` is the broad refresh command. It brings local git state up to date, reconciles merged branches, and refreshes `.git/stac-man/cache.db` with the latest GitHub-derived PR data it touches. Use [`sm status`](./status) when you only want a live checks/mergeability refresh without the full sync cleanup.
+
 ## See also
 
 - [Concepts → Sync](/concepts/sync) — the full step-by-step.
 - [`sm land`](./land) — merge the bottom-most PR and run sync as cleanup.
 - [`sm restack`](./restack) — the local-only counterpart.
+- [`sm status`](./status) — refresh live GitHub checks and mergeability only.

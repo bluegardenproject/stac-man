@@ -11,10 +11,9 @@ import (
 
 func init() {
 	cmd := &cobra.Command{
-		Use:     "doctor",
-		Aliases: []string{"status"},
-		Short:   "Sanity-check stac-man metadata vs. git state",
-		Args:    cobra.NoArgs,
+		Use:   "doctor",
+		Short: "Sanity-check stac-man metadata vs. git state",
+		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			r, err := newService().Doctor(c.Context())
 			if err != nil {
@@ -33,26 +32,10 @@ func renderDoctor(r service.DoctorReport) {
 	fmt.Printf("%s %s (trunk)\n", ui.Render(theme.Header, "→"), ui.Render(theme.Accent, r.Trunk))
 	fmt.Printf("%s %d tracked branches\n", ui.Render(theme.Header, "→"), r.TrackedCount)
 
-	if len(r.NeedsRestack) == 0 && len(r.StaleSHA) == 0 && len(r.DriftedParent) == 0 && len(r.UntrackedRoots) == 0 && len(r.Issues) == 0 && len(r.MergeConflicts) == 0 {
+	if len(r.NeedsRestack) == 0 && len(r.StaleSHA) == 0 && len(r.DriftedParent) == 0 && len(r.UntrackedRoots) == 0 && len(r.Issues) == 0 {
 		fmt.Println()
 		fmt.Println(ui.Render(theme.OK, "✓ everything looks healthy"))
 		return
-	}
-
-	if len(r.MergeConflicts) > 0 {
-		// Surfaced first because a CONFLICTING PR will block any
-		// `sm land` further down the stack and is the most likely
-		// thing the user came to doctor to discover.
-		fmt.Println()
-		fmt.Println(ui.Render(theme.Fail, "PRs with merge conflicts:"))
-		for _, mc := range r.MergeConflicts {
-			label := mc.Branch
-			if mc.PR > 0 {
-				label = fmt.Sprintf("#%d %s", mc.PR, mc.Branch)
-			}
-			fmt.Printf("  %s %s\n", ui.Render(theme.BadgeMergeConflict, "conflict"), label)
-		}
-		fmt.Println(ui.Render(theme.Dimmed, "  → resolve on GitHub or rebase locally; `sm sync` after an upstream merge often fixes this."))
 	}
 
 	if len(r.Issues) > 0 {

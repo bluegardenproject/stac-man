@@ -14,23 +14,20 @@ import (
 
 // LogOptions configures Log.
 type LogOptions struct {
-	// IncludePRStatus, when true, batches a `gh pr list` lookup per
-	// branch to decorate nodes with PR state. Skipped if gh isn't
-	// available.
+	// IncludePRStatus, when true, decorates nodes with cached PR
+	// summaries. `sm log` does not refresh GitHub state; `sm sync`
+	// and `sm status` own freshness.
 	IncludePRStatus bool
-	// IncludeChecks adds a CI rollup dot next to each PR pill. Set
-	// to false from the cmd layer when --no-checks is passed; falls
-	// through silently if gh isn't available.
+	// IncludeChecks is retained for output compatibility while live
+	// GitHub status moves behind `sm status`. It is only rendered when
+	// status data was supplied by a caller.
 	IncludeChecks bool
-	// IncludeMergeStatus adds the GitHub mergeability glyph next to
-	// each PR pill. False when --no-merge-status is passed. Drafts
-	// and closed PRs never render a glyph regardless of this flag.
+	// IncludeMergeStatus is retained for output compatibility while
+	// live GitHub status moves behind `sm status`. Drafts and closed
+	// PRs never render a glyph regardless of this flag.
 	IncludeMergeStatus bool
-	// Progress receives one step per gh round-trip the log makes
-	// (PR list, then per-PR status fetch for cache misses). Nil
-	// collapses to a discard reporter — the cmd layer wires up a
-	// real spinner for interactive `sm log` and Discard for the
-	// `--json` / `--porcelain` output paths.
+	// Progress is retained for callers that share LogOptions while
+	// live GitHub status moves behind explicit refresh commands.
 	Progress progress.Reporter
 }
 
@@ -293,41 +290,21 @@ func (s *Service) buildLogData(ctx context.Context, opts LogOptions) (*logData, 
 		current = ""
 	}
 
-	prog := opts.Progress
-	if prog == nil {
-		prog = progress.Discard()
-	}
+	needsRestack := s.computeNeedsRestackMap(ctx, g)
+	return s.buildLogDataWithGraph(ctx, trunk, current, g, opts, needsRestack), nil
+}
 
+func (s *Service) buildLogDataWithGraph(ctx context.Context, trunk, current string, g *stack.Graph, opts LogOptions, needsRestack map[string]bool) *logData {
 	prMap := map[string]gh.PR{}
 	statusMap := map[string]gh.PRStatus{}
 	if opts.IncludePRStatus {
-		client := gh.New("")
-		// Best-effort: if gh isn't available the rest of log still works.
-		if err := gh.PreflightCheck(ctx); err == nil {
-			tracked, _ := s.Store.ListTrackedBranches(ctx)
-			prog.Start("fetching PR list")
-			prs, err := client.PRsForBranches(ctx, tracked)
-			if err != nil {
-				prog.Fail("fetching PR list")
-			} else {
-				prog.Done("fetched PR list")
-				prMap = prs
-			}
-		}
-		statusMap = s.fetchPRStatuses(ctx, prMap, statusFetchOptions{
-			wantChecks: opts.IncludeChecks,
-			wantMerge:  opts.IncludeMergeStatus,
-			progress:   prog,
-		})
+		prMap = s.cachedPRs(ctx, g.Branches())
 	}
-
-	needsRestack := s.computeNeedsRestackMap(ctx, g)
-
 	return &logData{
 		Trunk:   trunk,
 		Current: current,
 		Roots:   buildLogTree(g, prMap, statusMap, needsRestack),
-	}, nil
+	}
 }
 
 // buildLogTree is the pure shape-builder. Given a stack graph and the

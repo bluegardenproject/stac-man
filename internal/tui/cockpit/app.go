@@ -76,6 +76,17 @@ type Model struct {
 	// it. Cleared by an explicit refresh keypress so a stale "✓"
 	// doesn't outlive the user's mental model of the stack state.
 	lastAction *actionResult
+	// statusRefreshing tracks the live GitHub status refresh that
+	// updates SQLite in the background. The dashboard keeps rendering
+	// the last cached status while this is true.
+	statusRefreshing bool
+	// statusAutoRefreshed prevents the initial background refresh
+	// from re-triggering after every snapshot repaint.
+	statusAutoRefreshed bool
+	// statusErr is the most recent live-status refresh failure. It is
+	// intentionally separate from loadErr so a GitHub hiccup does not
+	// hide the local stack view.
+	statusErr error
 
 	// conflictCursor is the index into snapshot.Paused.ConflictPaths
 	// for the conflict resolver's edit-target selection. Reset to 0
@@ -158,6 +169,14 @@ type detailMsg struct {
 	err    error
 }
 
+// statusRefreshMsg is delivered after a live GitHub status refresh.
+// The command fetches remote state and writes SQLite; Update folds the
+// returned rows into the current snapshot so badges change in place.
+type statusRefreshMsg struct {
+	report service.StatusReport
+	err    error
+}
+
 // loadSnapshotCmd kicks off a background read of the dashboard
 // payload. It captures the model's ctx so an outer cancellation
 // short-circuits the in-flight call.
@@ -178,6 +197,13 @@ func loadDetailCmd(ctx context.Context, svc *service.Service, branch string) tea
 	}
 }
 
+func refreshGitHubStatusCmd(ctx context.Context, svc *service.Service) tea.Cmd {
+	return func() tea.Msg {
+		report, err := svc.Status(ctx)
+		return statusRefreshMsg{report: report, err: err}
+	}
+}
+
 // Init kicks off the first snapshot load so the dashboard renders
 // real data on first paint instead of the loading placeholder.
 func (m Model) Init() tea.Cmd {
@@ -194,8 +220,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case snapshotMsg:
+		if msg.err != nil {
+			m.loadErr = msg.err
+			// Keep the previous snapshot visible on refresh errors.
+			if msg.snap == nil {
+				return m, nil
+			}
+		} else {
+			m.loadErr = nil
+		}
 		m.snapshot = msg.snap
-		m.loadErr = msg.err
 		if msg.snap != nil {
 			// routeAfterSnapshot reads firstLoad to decide on the
 			// first-load-into-paused jump, so it has to run before
@@ -203,7 +237,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.routeAfterSnapshot(msg.snap)
 			m.positionCursorAfterSnapshot(msg.snap)
 		}
-		return m, m.detailCmdForSelection()
+		detailCmd := m.detailCmdForSelection()
+		var statusCmd tea.Cmd
+		if !m.statusAutoRefreshed && snapshotHasPR(msg.snap) {
+			m.statusAutoRefreshed = true
+			m, statusCmd = m.startStatusRefresh()
+		}
+		return m, tea.Batch(detailCmd, statusCmd)
 	case detailMsg:
 		if msg.err != nil {
 			m.detailErrs[msg.branch] = msg.err
@@ -211,6 +251,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.details[msg.branch] = msg.view
 			delete(m.detailErrs, msg.branch)
+		}
+		return m, nil
+	case statusRefreshMsg:
+		m.statusRefreshing = false
+		if msg.err != nil {
+			m.statusErr = msg.err
+			return m, nil
+		}
+		m.statusErr = nil
+		if m.snapshot != nil {
+			mergeStatusReport(m.snapshot, msg.report)
 		}
 		return m, nil
 	case diffMsg:
@@ -441,6 +492,39 @@ func (m Model) detailCmdForSelection() tea.Cmd {
 		return nil
 	}
 	return loadDetailCmd(m.ctx, m.svc, branch)
+}
+
+func (m Model) startStatusRefresh() (Model, tea.Cmd) {
+	if m.svc == nil || m.statusRefreshing {
+		return m, nil
+	}
+	m.statusRefreshing = true
+	m.statusErr = nil
+	return m, refreshGitHubStatusCmd(m.ctx, m.svc)
+}
+
+func snapshotHasPR(snap *service.DashboardSnapshot) bool {
+	if snap == nil {
+		return false
+	}
+	for _, it := range snap.CheckoutItems {
+		if it.PR > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeStatusReport(snap *service.DashboardSnapshot, report service.StatusReport) {
+	if snap.GitHubStatus == nil {
+		snap.GitHubStatus = map[string]service.StatusBranch{}
+	}
+	for _, st := range report.Branches {
+		if st.Branch == "" || st.Err != "" {
+			continue
+		}
+		snap.GitHubStatus[st.Branch] = st
+	}
 }
 
 // View renders the active screen. Returning an empty string while

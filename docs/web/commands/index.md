@@ -25,7 +25,7 @@ Every `sm` subcommand, grouped by intent. For the canonical workflow see [Your f
 |---|---|
 | [`sm restack`](./restack) (alias: `rs`) | Rebase chain onto current parent tips. Pauses on conflict. |
 | [`sm continue` / `sm abort`](./continue) | Resume or bail out of a paused restack/sync. |
-| [`sm sync`](./sync) | Pull trunk, delete merged branches, restack survivors. |
+| [`sm sync`](./sync) | Pull trunk, delete merged branches, restack survivors, and refresh cached GitHub status. |
 
 ## PR ops
 
@@ -39,11 +39,12 @@ Every `sm` subcommand, grouped by intent. For the canonical workflow see [Your f
 
 | Command | What it does |
 |---|---|
-| [`sm log`](./log) (alias: `ls`) | Print the stack tree with PR + restack status. |
+| [`sm log`](./log) (alias: `ls`) | Print the local stack tree with cached PR summaries. |
 | [`sm show`](./show) | Detailed branch view: parent, children, ahead/behind, PR, commits. |
 | [`sm parent`](./parent) | Show or change the parent of a branch. |
 | [`sm children`](./children) | List the direct children of a branch. |
-| [`sm doctor`](./doctor) (alias: `status`) | Sanity-check stac-man metadata vs. git state. |
+| [`sm status`](./status) | Fetch live GitHub checks and mergeability, then update the local cache. |
+| [`sm doctor`](./doctor) | Sanity-check local stac-man metadata vs. git state. |
 
 ## Recovery
 
