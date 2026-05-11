@@ -198,8 +198,16 @@ func (s *Service) Modify(ctx context.Context, opts ModifyOptions) error {
 		_ = s.Store.SetBranch(ctx, current, meta)
 	}
 
-	// Now restack every descendant.
-	return restack.New(s.G, s.Store).Restack(ctx, current)
+	// Now restack every descendant. Git leaves HEAD on the last rebased
+	// branch, so return the user to the branch they modified once the
+	// stack update completes cleanly.
+	if err := restack.New(s.G, s.Store).Restack(ctx, current); err != nil {
+		return err
+	}
+	if err := s.G.Checkout(ctx, current); err != nil {
+		return fmt.Errorf("checking out original branch %s: %w", current, err)
+	}
+	return nil
 }
 
 // PausedError exposes the engine's PausedError type to callers so
