@@ -1,0 +1,113 @@
+# Dependabot keeps three ecosystems current:
+#
+#   1. GitHub Actions — the most pressing one. The Pages-deploy and CI
+#      workflows depend on actions/checkout, setup-node, setup-go,
+#      configure-pages, deploy-pages, etc. GitHub deprecates Node
+#      runtimes on a fixed schedule (Node 20 → Node 24 by 2026-06-02);
+#      a weekly check surfaces new majors as soon as they're cut.
+#
+#   2. npm in docs/web — VitePress and its theme deps. Patch/minor
+#      bumps are usually safe; majors (vitepress 1.x → 2.x) are the
+#      kind of thing we want flagged early so the docs site doesn't
+#      drift behind upstream.
+#
+#   3. Go modules at the repo root — the binary itself. cobra, viper,
+#      yaml.v3, charmbracelet/{lipgloss,bubbletea}, etc. A monthly
+#      cadence is enough; we don't want a flood of patch PRs in a
+#      repo this small.
+#
+# All updaters target `develop` because that's the integration branch
+# (release-please cuts merges develop → main).
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      # Bundle every GitHub-published action into one PR per cadence.
+      # They tend to update in lockstep (Node-runtime bumps especially)
+      # so a single review covers them all.
+      github-actions:
+        patterns:
+          - actions/*
+          - github/*
+
+  - package-ecosystem: npm
+    directory: /docs/web
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - docs
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    groups:
+      vitepress:
+        patterns:
+          - vitepress
+          - vue
+          - "@vitejs/*"
+        update-types:
+          - patch
+          - minor
+      dev-deps:
+        dependency-type: development
+        update-types:
+          - patch
+          - minor
+    ignore:
+      # Major bumps are noisy and almost always require a config
+      # migration; surface them as individual PRs instead of bundling
+      # them into the group.
+      - dependency-name: vitepress
+        update-types:
+          - version-update:semver-major
+      - dependency-name: vue
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: gomod
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - go
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # cobra/viper/spf13 ecosystem moves together; same with the
+      # bubble-tea family. One PR per group keeps reviews focused.
+      cobra:
+        patterns:
+          - github.com/spf13/*
+      bubbletea:
+        patterns:
+          - github.com/charmbracelet/*
