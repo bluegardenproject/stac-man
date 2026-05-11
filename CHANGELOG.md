@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.1](https://github.com/bluegardenproject/stac-man/compare/v1.0.0...v1.0.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **modify:** restore branch after descendant restack ([bac603e](https://github.com/bluegardenproject/stac-man/commit/bac603e0aa92b4339b6128feb734e7c1cc8fe24a))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump vue in /docs/web in the vitepress group ([7e66adf](https://github.com/bluegardenproject/stac-man/commit/7e66adf8c0b4dc13ce9abb214782e09e91da7464))
+
 ## [1.0.0](https://github.com/bluegardenproject/stac-man/compare/v0.2.1...v1.0.0) (2026-05-04)
 
 
