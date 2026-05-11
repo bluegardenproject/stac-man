@@ -239,6 +239,30 @@ func TestModifyStageAllWithUntrackedUsesAddAll(t *testing.T) {
 	}
 }
 
+func TestModifyRestoresOriginalBranchAfterRestackingDescendant(t *testing.T) {
+	s, r := newFakeService(t, "feat-a", "main", 1)
+	mem := s.Store.(*memory.Store)
+	if err := mem.SetBranch(context.Background(), "feat-a", store.BranchMeta{Parent: "main", ParentSHA: "main-old"}); err != nil {
+		t.Fatalf("SetBranch feat-a: %v", err)
+	}
+	if err := mem.SetBranch(context.Background(), "feat-b", store.BranchMeta{Parent: "feat-a", ParentSHA: "feat-a-old"}); err != nil {
+		t.Fatalf("SetBranch feat-b: %v", err)
+	}
+	r.responses["rev-parse --verify main^{commit}"] = "main-new"
+	r.responses["rev-parse --verify feat-a^{commit}"] = "feat-a-new"
+
+	if err := s.Modify(context.Background(), ModifyOptions{Amend: true, StageAll: true}); err != nil {
+		t.Fatalf("Modify: %v", err)
+	}
+	if !r.called("rebase", "--onto", "feat-a-new", "feat-a-old", "feat-b") {
+		t.Fatalf("expected descendant rebase, calls: %v", r.calls)
+	}
+	last := r.calls[len(r.calls)-1]
+	if len(last) != 2 || last[0] != "checkout" || last[1] != "feat-a" {
+		t.Fatalf("expected final checkout back to feat-a, calls: %v", r.calls)
+	}
+}
+
 // stagerSpy is a minimal gitStager that records which staging variant
 // was invoked. Lets us unit-test stageWorkingTree without spinning up
 // a full fake runner.
