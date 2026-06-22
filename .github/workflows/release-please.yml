@@ -24,7 +24,7 @@ jobs:
           target-branch: main
 
       # Build and upload binaries only when a release is created.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: ${{ steps.release.outputs.release_created }}
 
       - name: Set up Go
