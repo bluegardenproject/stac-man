@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/bluegardenproject/stac-man/internal/gh"
 	"github.com/bluegardenproject/stac-man/internal/service"
 )
 
@@ -229,6 +230,74 @@ func TestRefreshClearsDetailCache(t *testing.T) {
 	}
 	if got.lastAction != nil {
 		t.Fatalf("lastAction = %+v after refresh, want nil (manual refresh resets the status banner)", got.lastAction)
+	}
+}
+
+func TestSnapshotLoadErrorKeepsPreviousSnapshot(t *testing.T) {
+	m := New(context.Background(), nil)
+	m.snapshot = sampleSnapshot()
+	m.cursor = 1
+
+	next, _ := m.Update(snapshotMsg{err: errors.New("git exploded")})
+	got := next.(Model)
+	if got.snapshot == nil {
+		t.Fatalf("snapshot was cleared after refresh error")
+	}
+	if got.snapshot.Current != "feat-a" {
+		t.Fatalf("snapshot.Current = %q, want previous snapshot to remain visible", got.snapshot.Current)
+	}
+	if got.loadErr == nil {
+		t.Fatalf("loadErr was not recorded")
+	}
+}
+
+func TestStatusRefreshMergesRowsIntoVisibleSnapshot(t *testing.T) {
+	m := New(context.Background(), nil)
+	m.snapshot = sampleSnapshot()
+	m.snapshot.CheckoutItems[1].PR = 10
+
+	next, _ := m.Update(statusRefreshMsg{report: service.StatusReport{
+		Branches: []service.StatusBranch{
+			{
+				Branch:    "feat-a",
+				PR:        10,
+				Checks:    gh.ChecksPass,
+				Mergeable: gh.MergeMergeable,
+			},
+		},
+	}})
+	got := next.(Model)
+	st := got.snapshot.GitHubStatus["feat-a"]
+	if st.PR != 10 || st.Checks != gh.ChecksPass || st.Mergeable != gh.MergeMergeable {
+		t.Fatalf("cached status = %+v, want merged live status for feat-a", st)
+	}
+}
+
+func TestViewRendersCachedGitHubStatusAndRefreshBanner(t *testing.T) {
+	m := New(context.Background(), nil)
+	m.snapshot = sampleSnapshot()
+	m.snapshot.CheckoutItems[1].PR = 10
+	m.snapshot.GitHubStatus = map[string]service.StatusBranch{
+		"feat-a": {
+			Branch:    "feat-a",
+			PR:        10,
+			Checks:    gh.ChecksPass,
+			Mergeable: gh.MergeConflicting,
+		},
+	}
+	m.cursor = 1
+	m.statusRefreshing = true
+
+	out := m.View()
+	for _, want := range []string{
+		"refreshing GitHub status",
+		"CI",
+		"pass",
+		"conflict",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("View() missing %q. Got:\n%s", want, out)
+		}
 	}
 }
 

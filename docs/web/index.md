@@ -21,13 +21,13 @@ hero:
 
 features:
   - title: Local-first metadata
-    details: Stack relationships live in `.git/config`. No service to log into, no project to create. Drop the binary on your PATH and start stacking.
+    details: Stack relationships live in `.git/config`, while GitHub-derived PR/status data is cached in `.git/stac-man/cache.db`. No service to log into, no project to create.
   - title: Stack-aware git verbs
     details: '`sm create`, `sm modify`, `sm restack`, `sm sync` — every mutating command rewrites descendants for you so the chain stays consistent.'
   - title: Interactive cockpit
     details: 'Bare `sm` on a TTY opens a Bubble Tea TUI: dashboard, conflict resolver, diff viewer, and a fuzzy command palette over every common verb.'
-  - title: PRs through gh
-    details: '`sm submit --stack` pushes every branch and opens or retargets PRs through the GitHub CLI. No tokens stored, no extra auth.'
+  - title: GitHub on demand
+    details: '`sm log` stays fast and local-first. `sm status`, `sm sync`, and `sm submit` call GitHub through `gh` only when you ask for fresh remote state.'
   - title: Recover, undo, doctor
     details: Every mutation is journalled. `sm undo` rewinds the last op; `sm doctor` reports drift; `sm absorb` routes loose hunks back where they belong.
 ---
@@ -69,6 +69,12 @@ sm log
 
 ```bash
 sm submit --stack
+```
+
+When you need GitHub's live view of CI and mergeability:
+
+```bash
+sm status
 ```
 
 That's the whole loop. From here:

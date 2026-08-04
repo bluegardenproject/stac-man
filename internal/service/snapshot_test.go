@@ -49,12 +49,25 @@ func (s snapshotRunner) Run(_ context.Context, args ...string) (string, string, 
 	return "", "", nil
 }
 
+type countingSnapshotRunner struct {
+	snapshotRunner
+	revParseRefs []string
+}
+
+func (s *countingSnapshotRunner) Run(ctx context.Context, args ...string) (string, string, error) {
+	if len(args) >= 3 && args[0] == "rev-parse" && args[1] == "--verify" {
+		s.revParseRefs = append(s.revParseRefs, args[2])
+		return "deadbeef", "", nil
+	}
+	return s.snapshotRunner.Run(ctx, args...)
+}
+
 func newSnapshotService(t *testing.T, current, gitDir string) (*Service, store.Store) {
 	t.Helper()
 	return newSnapshotServiceWithRunner(t, snapshotRunner{current: current, gitDir: gitDir})
 }
 
-func newSnapshotServiceWithRunner(t *testing.T, r snapshotRunner) (*Service, store.Store) {
+func newSnapshotServiceWithRunner(t *testing.T, r git.Runner) (*Service, store.Store) {
 	t.Helper()
 	mem := memory.New()
 	if err := mem.SetRepo(context.Background(), store.RepoMeta{Trunk: "main", Version: 1}); err != nil {
@@ -148,6 +161,26 @@ func TestSnapshotMultiBranchTreeAtomic(t *testing.T) {
 		if it.Branch == "feat-b" && !it.IsCurrent {
 			t.Fatalf("CheckoutItems[feat-b].IsCurrent = false, want true")
 		}
+	}
+}
+
+func TestSnapshotReusesNeedsRestackComputation(t *testing.T) {
+	runner := &countingSnapshotRunner{
+		snapshotRunner: snapshotRunner{current: "feat-b", gitDir: t.TempDir()},
+	}
+	svc, st := newSnapshotServiceWithRunner(t, runner)
+	if err := st.SetBranch(context.Background(), "feat-a", store.BranchMeta{Parent: "main", ParentSHA: "deadbeef"}); err != nil {
+		t.Fatalf("SetBranch feat-a: %v", err)
+	}
+	if err := st.SetBranch(context.Background(), "feat-b", store.BranchMeta{Parent: "feat-a", ParentSHA: "deadbeef"}); err != nil {
+		t.Fatalf("SetBranch feat-b: %v", err)
+	}
+
+	if _, err := svc.Snapshot(context.Background(), LogOptions{}); err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if got, want := len(runner.revParseRefs), 2; got != want {
+		t.Fatalf("rev-parse parent-tip probes = %d (%v), want %d; Snapshot should share needs-restack work between panes", got, runner.revParseRefs, want)
 	}
 }
 

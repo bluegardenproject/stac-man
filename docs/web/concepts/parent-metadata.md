@@ -21,7 +21,7 @@ And one repo-level key:
     version = 2                            # metadata schema version
 ```
 
-That's the entire on-disk surface in steady state. (Two more files appear during a paused restack and the undo log; see below.)
+That's the source-of-truth metadata surface in steady state. Derived GitHub data may also be cached under `.git/stac-man/cache.db`, but the stack graph itself remains in git config.
 
 ## What each key means
 
@@ -43,16 +43,17 @@ The GitHub PR number, recorded when `sm submit` opens or adopts a PR. Used by `s
 
 ## The transient files
 
-Two small JSON files appear under `.git/stac-man/` for the duration of specific operations:
+Additional local state lives under `.git/stac-man/`:
 
 - `restack.json` — the in-flight queue while a restack is paused on a conflict. Cleared by `sm continue` (when the queue drains) or `sm abort`.
 - `history.json` — the rolling undo log, capped at 50 entries. `sm undo` consumes it.
+- `cache.db` — a disposable SQLite cache for GitHub-derived PR/status data.
 
 You should not edit these by hand. If `restack.json` is malformed, `sm abort` is always safe.
 
 ## What `sm doctor` checks
 
-`sm doctor` (alias `sm status`) re-derives the truth from git itself and compares it to the metadata above. It reports:
+`sm doctor` re-derives the truth from git itself and compares it to the metadata above. It reports:
 
 | Issue | What it means | Fix |
 |---|---|---|

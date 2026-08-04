@@ -51,6 +51,13 @@ export default defineConfig({
       { text: 'Recipes', link: '/recipes/' },
       { text: 'Troubleshooting', link: '/troubleshooting' },
       { text: 'FAQ', link: '/faq' },
+      {
+        text: 'v2.x',
+        items: [
+          { text: 'v2.x (latest)', link: '/' },
+          { text: 'v1.x', link: '/v1/' },
+        ],
+      },
     ],
 
     sidebar: {
@@ -75,6 +82,7 @@ export default defineConfig({
             { text: 'Sync', link: '/concepts/sync' },
             { text: 'Parent metadata', link: '/concepts/parent-metadata' },
             { text: 'Cockpit (TUI)', link: '/concepts/cockpit' },
+            { text: 'Migrating to v2', link: '/concepts/v2-migration' },
           ],
         },
       ],
@@ -124,6 +132,7 @@ export default defineConfig({
             { text: 'sm show', link: '/commands/show' },
             { text: 'sm parent', link: '/commands/parent' },
             { text: 'sm children', link: '/commands/children' },
+            { text: 'sm status', link: '/commands/status' },
             { text: 'sm doctor', link: '/commands/doctor' },
           ],
         },
@@ -157,6 +166,113 @@ export default defineConfig({
             { text: 'Recover from a bad rebase', link: '/recipes/recover-from-bad-rebase' },
             { text: "Review someone's stack", link: '/recipes/review-someones-stack' },
             { text: 'Absorb fixups', link: '/recipes/absorb-fixups' },
+          ],
+        },
+      ],
+
+      '/v1/get-started/': [
+        {
+          text: 'Get Started',
+          items: [
+            { text: 'Install', link: '/v1/get-started/install' },
+            { text: 'Your first stack', link: '/v1/get-started/first-stack' },
+          ],
+        },
+      ],
+
+      '/v1/concepts/': [
+        {
+          text: 'Concepts',
+          items: [
+            { text: 'Overview', link: '/v1/concepts/' },
+            { text: 'Stacks', link: '/v1/concepts/stacks' },
+            { text: 'Trunk', link: '/v1/concepts/trunk' },
+            { text: 'Restack', link: '/v1/concepts/restack' },
+            { text: 'Sync', link: '/v1/concepts/sync' },
+            { text: 'Parent metadata', link: '/v1/concepts/parent-metadata' },
+            { text: 'Cockpit (TUI)', link: '/v1/concepts/cockpit' },
+          ],
+        },
+      ],
+
+      '/v1/commands/': [
+        {
+          text: 'Commands',
+          items: [{ text: 'Overview', link: '/v1/commands/' }],
+        },
+        {
+          text: 'Navigation',
+          items: [
+            { text: 'sm checkout', link: '/v1/commands/checkout' },
+            { text: 'sm up / down / top / bottom', link: '/v1/commands/nav' },
+          ],
+        },
+        {
+          text: 'Mutation',
+          items: [
+            { text: 'sm create', link: '/v1/commands/create' },
+            { text: 'sm modify', link: '/v1/commands/modify' },
+            { text: 'sm fold', link: '/v1/commands/fold' },
+            { text: 'sm split', link: '/v1/commands/split' },
+            { text: 'sm move', link: '/v1/commands/move' },
+          ],
+        },
+        {
+          text: 'Restack engine',
+          items: [
+            { text: 'sm restack', link: '/v1/commands/restack' },
+            { text: 'sm continue / abort', link: '/v1/commands/continue' },
+            { text: 'sm sync', link: '/v1/commands/sync' },
+          ],
+        },
+        {
+          text: 'PR ops',
+          items: [
+            { text: 'sm submit', link: '/v1/commands/submit' },
+            { text: 'sm land', link: '/v1/commands/land' },
+            { text: 'sm get', link: '/v1/commands/get' },
+          ],
+        },
+        {
+          text: 'Inspection',
+          items: [
+            { text: 'sm log', link: '/v1/commands/log' },
+            { text: 'sm show', link: '/v1/commands/show' },
+            { text: 'sm parent', link: '/v1/commands/parent' },
+            { text: 'sm children', link: '/v1/commands/children' },
+            { text: 'sm doctor', link: '/v1/commands/doctor' },
+          ],
+        },
+        {
+          text: 'Recovery',
+          items: [
+            { text: 'sm undo', link: '/v1/commands/undo' },
+            { text: 'sm absorb', link: '/v1/commands/absorb' },
+          ],
+        },
+        {
+          text: 'Setup',
+          items: [
+            { text: 'sm track', link: '/v1/commands/track' },
+            { text: 'sm untrack', link: '/v1/commands/untrack' },
+            { text: 'sm completion', link: '/v1/commands/completion' },
+            { text: 'sm config', link: '/v1/commands/config' },
+            { text: 'sm version', link: '/v1/commands/version' },
+            { text: 'sm update', link: '/v1/commands/update' },
+          ],
+        },
+      ],
+
+      '/v1/recipes/': [
+        {
+          text: 'Recipes',
+          items: [
+            { text: 'Overview', link: '/v1/recipes/' },
+            { text: 'Split a fat branch', link: '/v1/recipes/split-fat-branch' },
+            { text: 'Land the bottom of a stack', link: '/v1/recipes/land-bottom-of-stack' },
+            { text: 'Recover from a bad rebase', link: '/v1/recipes/recover-from-bad-rebase' },
+            { text: "Review someone's stack", link: '/v1/recipes/review-someones-stack' },
+            { text: 'Absorb fixups', link: '/v1/recipes/absorb-fixups' },
           ],
         },
       ],

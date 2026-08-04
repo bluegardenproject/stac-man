@@ -2,9 +2,7 @@ package gh
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestRollupFromEntriesEmptyIsNone(t *testing.T) {
@@ -150,69 +148,6 @@ func TestPRStatusForNumberParsesGhJSON(t *testing.T) {
 		if !containsSubstring(jsonArg, key) {
 			t.Fatalf("expected json arg to request %q, got %q", key, jsonArg)
 		}
-	}
-}
-
-func TestChecksCacheRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	c := LoadChecksCache(dir)
-	if got, ok := c.Get(7); ok {
-		t.Fatalf("expected miss on empty cache, got %+v", got)
-	}
-	c.Put(7, PRStatus{Number: 7, Checks: ChecksPass, Mergeable: MergeMergeable, State: PRStateOpen})
-	if err := c.Save(dir); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
-	// A separate Load should see the entry.
-	got, ok := LoadChecksCache(dir).Get(7)
-	if !ok {
-		t.Fatalf("expected cache hit after save")
-	}
-	if got.Checks != ChecksPass || got.Mergeable != MergeMergeable {
-		t.Fatalf("unexpected cached PRStatus: %+v", got)
-	}
-}
-
-func TestChecksCacheRespectsTTL(t *testing.T) {
-	dir := t.TempDir()
-	c := LoadChecksCache(dir)
-	c.Put(99, PRStatus{Number: 99, Checks: ChecksPass})
-	// Hand-stomp the FetchedAt to simulate an expired entry without
-	// sleeping the full TTL.
-	entry := c.Entries["99"]
-	entry.FetchedAt = time.Now().Add(-2 * checksCacheTTL)
-	c.Entries["99"] = entry
-	if _, ok := c.Get(99); ok {
-		t.Fatalf("expected expired entry to be a cache miss")
-	}
-}
-
-func TestInvalidateChecksCacheRemovesFile(t *testing.T) {
-	dir := t.TempDir()
-	c := LoadChecksCache(dir)
-	c.Put(1, PRStatus{Number: 1})
-	if err := c.Save(dir); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-	if err := InvalidateChecksCache(dir); err != nil {
-		t.Fatalf("InvalidateChecksCache: %v", err)
-	}
-	// Subsequent invalidate is a no-op.
-	if err := InvalidateChecksCache(dir); err != nil {
-		t.Fatalf("second InvalidateChecksCache: %v", err)
-	}
-	// And subsequent load returns empty.
-	if got, ok := LoadChecksCache(dir).Get(1); ok {
-		t.Fatalf("expected cache empty after invalidate, got %+v", got)
-	}
-}
-
-func TestChecksCachePathIsUnderGitDir(t *testing.T) {
-	got := ChecksCachePath("/tmp/x/.git")
-	want := filepath.Join("/tmp/x/.git", "stac-man", "checks-cache.json")
-	if got != want {
-		t.Fatalf("ChecksCachePath = %s, want %s", got, want)
 	}
 }
 

@@ -55,7 +55,7 @@ For each branch in scope:
 
 After every PR exists (one or more of the above per branch), `sm submit` runs a final pass that rewrites each PR's description to inject — or refresh — the [stack table](#pr-body-stack-table). Skipped unless `--no-stack-table` was passed.
 
-The combined CI / mergeability cache at `.git/stac-man/checks-cache.json` is cleared at the end of submit, so the next `sm log` fetches fresh status for every PR you just touched.
+`sm submit` also updates cached PR summaries for PRs it creates or edits, and invalidates volatile status rows so the next [`sm status`](./status) or [`sm sync`](./sync) fetches fresh checks and mergeability.
 
 ## Output
 

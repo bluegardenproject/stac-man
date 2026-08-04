@@ -11,6 +11,7 @@
 5. **Delete merged branches locally.**
 6. **Restack survivors.** Every remaining tracked branch is rebased onto its (possibly new) parent's tip.
 7. **Retarget PR bases on GitHub** for any branch whose parent changed during step 4 (so reviewers see the new base).
+8. **Refresh cached GitHub metadata** for tracked PRs so local-first commands and the cockpit can reuse the latest known PR/status rows.
 
 ## Mental model
 
@@ -50,9 +51,14 @@ Resolve, `git add`, then `sm continue` — same protocol.
 | Updates trunk? | Yes (fast-forward) | No |
 | Deletes merged branches? | Yes | No |
 | Rebases descendants? | Yes | Yes |
+| Refreshes GitHub status cache? | Yes | No |
 | Cost | Higher (network) | Local only |
 
 Use `sm sync` once a day or when something landed on origin. Use `sm restack` for purely-local churn.
+
+## Sync vs. status
+
+Use `sm sync` when repository state may have changed: trunk advanced, PRs merged, or bases need retargeting. Use [`sm status`](/commands/status) when you only need GitHub's current checks and mergeability for the stack you already have locally.
 
 ## Configuring
 

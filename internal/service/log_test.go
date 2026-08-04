@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/bluegardenproject/stac-man/internal/cache"
 	"github.com/bluegardenproject/stac-man/internal/gh"
+	"github.com/bluegardenproject/stac-man/internal/git"
 	"github.com/bluegardenproject/stac-man/internal/stack"
 	"github.com/bluegardenproject/stac-man/internal/store"
 	"github.com/bluegardenproject/stac-man/internal/store/memory"
@@ -66,6 +69,95 @@ func TestRenderMergeBadgeAllStates(t *testing.T) {
 func TestRenderMergeBadgeRejectsUnrecognized(t *testing.T) {
 	if got := renderMergeBadge("BOGUS"); got != "" {
 		t.Fatalf("renderMergeBadge(\"BOGUS\") = %q, want empty", got)
+	}
+}
+
+type logCacheRunner struct {
+	gitDir string
+}
+
+func (r logCacheRunner) Run(_ context.Context, args ...string) (string, string, error) {
+	if len(args) >= 2 && args[0] == "rev-parse" && args[1] == "--is-inside-work-tree" {
+		return "true", "", nil
+	}
+	if len(args) >= 2 && args[0] == "rev-parse" && args[1] == "--git-dir" {
+		return r.gitDir, "", nil
+	}
+	if len(args) > 0 && args[0] == "rev-parse" {
+		return "sha-main", "", nil
+	}
+	if len(args) >= 3 && args[0] == "symbolic-ref" && args[1] == "--short" && args[2] == "HEAD" {
+		return "feat-a", "", nil
+	}
+	return "", "", nil
+}
+
+func TestBuildLogDataUsesCachedPRSummaries(t *testing.T) {
+	ctx := context.Background()
+	gitDir := filepath.Join(t.TempDir(), ".git")
+	db, err := cache.Open(ctx, gitDir)
+	if err != nil {
+		t.Fatalf("cache.Open: %v", err)
+	}
+	if err := db.PutPRSnapshot(ctx, cache.PRSnapshot{
+		Branch: "feat-a",
+		Number: 10,
+		State:  "OPEN",
+		Title:  "Cached title",
+		URL:    "https://github.com/acme/widgets/pull/10",
+		Base:   "main",
+		Head:   "feat-a",
+	}); err != nil {
+		t.Fatalf("PutPRSnapshot: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("Close cache: %v", err)
+	}
+
+	mem := memory.New()
+	if err := mem.SetRepo(ctx, store.RepoMeta{Trunk: "main", Version: 1}); err != nil {
+		t.Fatalf("SetRepo: %v", err)
+	}
+	if err := mem.SetBranch(ctx, "feat-a", store.BranchMeta{Parent: "main", ParentSHA: "sha-main", PR: 10}); err != nil {
+		t.Fatalf("SetBranch feat-a: %v", err)
+	}
+	if err := mem.SetBranch(ctx, "feat-b", store.BranchMeta{Parent: "main", ParentSHA: "sha-main"}); err != nil {
+		t.Fatalf("SetBranch feat-b: %v", err)
+	}
+
+	svc := &Service{G: git.NewWithRunner(logCacheRunner{gitDir: gitDir}), Store: mem}
+	data, err := svc.buildLogData(ctx, LogOptions{
+		IncludePRStatus:    true,
+		IncludeChecks:      true,
+		IncludeMergeStatus: true,
+	})
+	if err != nil {
+		t.Fatalf("buildLogData: %v", err)
+	}
+
+	var featA, featB *logBranchNode
+	for _, root := range data.Roots {
+		switch root.Branch.Name {
+		case "feat-a":
+			featA = root
+		case "feat-b":
+			featB = root
+		}
+	}
+	if featA == nil || featA.PR == nil {
+		t.Fatalf("feat-a cached PR missing: %+v", featA)
+	}
+	if featA.PR.Number != 10 || featA.PR.Title != "Cached title" || featA.PR.URL == "" {
+		t.Fatalf("feat-a PR = %+v, want cached summary", featA.PR)
+	}
+	if featA.Status != nil {
+		t.Fatalf("default log should not attach volatile status from GitHub, got %+v", featA.Status)
+	}
+	if featB == nil {
+		t.Fatalf("feat-b missing from log roots")
+	}
+	if featB.PR != nil {
+		t.Fatalf("feat-b has no cached or recorded PR, got %+v", featB.PR)
 	}
 }
 

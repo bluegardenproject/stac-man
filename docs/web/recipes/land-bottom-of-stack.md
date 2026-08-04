@@ -8,20 +8,20 @@ The bottom-most PR has approvals and green CI. You want to land it AND keep work
 stac-man
 
 main
-└─ feat/auth-models  #41 open  CI ready
-   └─ feat/auth-handlers  #42 open  CI ready
-      └─ feat/auth-docs  ← current  #43 draft  CI
+└─ feat/auth-models  #41 open
+   └─ feat/auth-handlers  #42 open
+      └─ feat/auth-docs  ← current  #43 draft
 ```
 
-You're sitting on `feat/auth-docs`. PR #41 is approved and green; the `CI` chip is green and the `ready` chip says GitHub considers it mergeable.
+You're sitting on `feat/auth-docs`. PR #41 is approved and green.
 
 ## Step 1 — confirm the bottom is ready
 
 ```bash
-sm log
+sm status
 ```
 
-The CI badge on the bottom-most row tells you everything you need to know: green `CI` plus green `ready` means `sm land` will proceed without `--force`. If you see a red `CI`, an orange `conflict`, or a `draft` pill on the bottom-most PR, decide whether you really want to land it before continuing — `sm land` refuses red CI unless you pass `--force`, and a `conflict` chip means the PR will be rejected by GitHub regardless of stac-man's gates.
+`sm status` fetches GitHub's live checks and mergeability. Green `CI pass` plus `mergeable` on the bottom-most row means `sm land` should proceed without `--force`. If you see `CI fail`, `conflict`, or a draft state on the bottom-most PR, decide whether you really want to land it before continuing — `sm land` refuses red CI unless you pass `--force`, and a conflict means GitHub will reject the merge regardless of stac-man's gates.
 
 ## Step 2 — land
 
@@ -48,8 +48,8 @@ What happens, in order:
 stac-man
 
 main
-└─ feat/auth-handlers  #42 open  CI ready
-   └─ feat/auth-docs  ← current  #43 draft  CI
+└─ feat/auth-handlers  #42 open
+   └─ feat/auth-docs  ← current  #43 draft
 ```
 
 `feat/auth-models` is gone locally. PR #41 is merged. PR #42's base now points at `main` so reviewers see only the handler diff. The `sm submit` that runs as part of `sm land`'s sync also refreshes the [stack table](/commands/submit#pr-body-stack-table) on every remaining PR's body so the chain reads one shorter.
